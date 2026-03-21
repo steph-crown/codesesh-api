@@ -110,6 +110,7 @@ pub struct PaginatedResponse<T: Serialize> {
 
 impl SessionSummaryResponse {
   pub fn from_session(session: Session, requesting_user_id: Uuid) -> Self {
+    let is_owner = session.is_owned_by(requesting_user_id);
     Self {
       id: session.id,
       short_id: session.short_id,
@@ -118,7 +119,7 @@ impl SessionSummaryResponse {
       visibility: session.visibility,
       status: session.status,
       event_count: session.event_count,
-      is_owner: session.is_owned_by(requesting_user_id),
+      is_owner,
       last_activity_at: session.last_activity_at,
       created_at: session.created_at,
     }
@@ -127,6 +128,7 @@ impl SessionSummaryResponse {
 
 impl SessionDetailResponse {
   pub fn from_session(session: Session, requesting_user_id: Uuid) -> Self {
+    let is_owner = session.is_owned_by(requesting_user_id);
     Self {
       id: session.id,
       short_id: session.short_id,
@@ -136,7 +138,7 @@ impl SessionDetailResponse {
       status: session.status,
       content: session.content,
       event_count: session.event_count,
-      is_owner: session.is_owned_by(requesting_user_id),
+      is_owner,
       last_activity_at: session.last_activity_at,
       created_at: session.created_at,
       updated_at: session.updated_at,

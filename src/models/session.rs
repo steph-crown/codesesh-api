@@ -1,7 +1,9 @@
+use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
-#[derive(Debug, Clone, sqlx::Type, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type, PartialEq)]
+#[serde(rename_all = "snake_case")]
 #[sqlx(type_name = "session_visibility", rename_all = "snake_case")]
 pub enum SessionVisibility {
   Private,
@@ -9,14 +11,16 @@ pub enum SessionVisibility {
   Edit,
 }
 
-#[derive(Debug, Clone, sqlx::Type, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type, PartialEq)]
+#[serde(rename_all = "snake_case")]
 #[sqlx(type_name = "session_status", rename_all = "snake_case")]
 pub enum SessionStatus {
   Active,
   Ended,
 }
 
-#[derive(Debug, Clone, sqlx::Type, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type, PartialEq)]
+#[serde(rename_all = "lowercase")]
 #[sqlx(type_name = "session_language")]
 pub enum SessionLanguage {
   #[sqlx(rename = "typescript")]
