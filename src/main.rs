@@ -1,4 +1,3 @@
-use axum::{Router, routing::get};
 use config::Config;
 use state::AppState;
 

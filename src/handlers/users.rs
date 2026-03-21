@@ -1,5 +1,4 @@
 use axum::{Json, extract::State};
-use serde_json::json;
 use uuid::Uuid;
 
 use crate::{
@@ -9,11 +8,11 @@ use crate::{
 };
 
 pub async fn create_user(
-  State(state): State<AppState>,
-  Json(user): Json<CreateUserRequest>,
+  State(_state): State<AppState>,
+  Json(payload): Json<CreateUserRequest>,
 ) -> AppResult<Json<CreateUserResponse>> {
   Ok(Json(CreateUserResponse {
-    id: Uuid::new_v4(),
-    display_name: "Meee".to_string(),
+    id: Uuid::nil(),
+    display_name: payload.display_name,
   }))
 }
