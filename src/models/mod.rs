@@ -5,5 +5,5 @@ mod user;
 
 pub use message::ChatMessage;
 pub use participant::SessionParticipant;
-pub use session::{Session, SessionStatus, SessionVisibility};
+pub use session::{Session, SessionLanguage, SessionStatus, SessionVisibility};
 pub use user::User;
