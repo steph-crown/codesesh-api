@@ -46,7 +46,7 @@ pub enum AppError {
   #[error("session is already ended")]
   SessionAlreadyEnded,
 
-  /// text_change received but session has hit the 100,000 event cap
+  /// Post-MVP: text_change when session has hit the 100,000 event cap (MVP does not enforce).
   #[error("session event limit reached")]
   SessionEventCapReached,
 

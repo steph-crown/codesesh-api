@@ -28,7 +28,8 @@ pub struct Session {
   pub status: SessionStatus,
   pub content: String,
   pub last_activity_at: OffsetDateTime,
-  pub event_count: i32, // will be used post mvp for session events.
+  /// Reserved for post-MVP event-cap tracking; not incremented or enforced in MVP.
+  pub event_count: i32,
   pub created_at: OffsetDateTime,
   pub updated_at: OffsetDateTime,
 }
