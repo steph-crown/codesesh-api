@@ -276,3 +276,5 @@ impl From<ServiceError> for AppError {
     }
   }
 }
+
+pub type AppResult<T> = Result<T, AppError>;
