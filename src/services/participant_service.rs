@@ -28,7 +28,7 @@ pub async fn list_participants(
 
   Ok(rows
     .into_iter()
-    .map(|(p, name)| ParticipantResponse::from_participant(p, name))
+    .map(|(p, name, color)| ParticipantResponse::from_participant(p, name, color))
     .collect())
 }
 
@@ -63,5 +63,6 @@ pub async fn join_session(
   Ok(ParticipantResponse::from_participant(
     participant,
     user.display_name,
+    user.color,
   ))
 }

@@ -10,4 +10,4 @@ pub use session_dto::{
   SessionDetailResponse, SessionSummaryResponse, UpdateSessionNameRequest,
   UpdateSessionVisibilityRequest,
 };
-pub use user_dto::{CreateUserRequest, CreateUserResponse};
+pub use user_dto::{CreateUserRequest, UserResponse};

@@ -7,5 +7,6 @@ use uuid::Uuid;
 pub struct User {
   pub id: Uuid,
   pub display_name: String,
+  pub color: String,
   pub created_at: OffsetDateTime,
 }

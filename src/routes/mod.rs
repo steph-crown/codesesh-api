@@ -12,7 +12,7 @@ use crate::handlers::{
     create_session, end_session, get_session, list_sessions, update_session_name,
     update_session_visibility,
   },
-  users::create_user,
+  users::{create_user, get_current_user},
   ws::session_websocket,
 };
 use crate::state::AppState;
@@ -23,6 +23,7 @@ pub fn app_router(state: AppState) -> Router {
     .nest(
       "/api",
       Router::new()
+        .route("/users/me", get(get_current_user))
         .route("/users", post(create_user))
         .route("/sessions", get(list_sessions).post(create_session))
         .route("/sessions/{session_id}", get(get_session))

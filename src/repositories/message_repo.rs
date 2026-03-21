@@ -10,6 +10,7 @@ pub struct MessageWithAuthor {
   pub content: String,
   pub created_at: OffsetDateTime,
   pub display_name: String,
+  pub color: String,
 }
 
 /// Chat history: newest-first page, returned in chronological order (oldest → newest).
@@ -28,7 +29,8 @@ pub async fn list_history(
       m.user_id,
       m.content,
       m.created_at,
-      u.display_name
+      u.display_name,
+      u.color
     FROM chat_messages m
     INNER JOIN users u ON u.id = m.user_id
     WHERE m.session_id = $1

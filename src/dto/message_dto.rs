@@ -17,6 +17,7 @@ pub struct ChatMessageResponse {
   pub session_id: Uuid,
   pub user_id: Uuid,
   pub display_name: String, // joined from users table — not on ChatMessage model
+  pub color: String,
   pub content: String,
   pub created_at: OffsetDateTime,
 }

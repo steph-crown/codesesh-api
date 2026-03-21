@@ -34,6 +34,7 @@ pub async fn list_messages(
       session_id: r.session_id,
       user_id: r.user_id,
       display_name: r.display_name,
+      color: r.color,
       content: r.content,
       created_at: r.created_at,
     })

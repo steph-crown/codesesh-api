@@ -12,12 +12,13 @@ struct ParticipantWithNameRow {
   joined_at: OffsetDateTime,
   left_at: Option<OffsetDateTime>,
   display_name: String,
+  color: String,
 }
 
 pub async fn list_with_display_names(
   pool: &PgPool,
   session_id: Uuid,
-) -> Result<Vec<(SessionParticipant, String)>, sqlx::Error> {
+) -> Result<Vec<(SessionParticipant, String, String)>, sqlx::Error> {
   let rows: Vec<ParticipantWithNameRow> = sqlx::query_as(
     r#"
     SELECT
@@ -26,7 +27,8 @@ pub async fn list_with_display_names(
       sp.user_id,
       sp.joined_at,
       sp.left_at,
-      u.display_name
+      u.display_name,
+      u.color
     FROM session_participants sp
     INNER JOIN users u ON u.id = sp.user_id
     WHERE sp.session_id = $1
@@ -49,6 +51,7 @@ pub async fn list_with_display_names(
           left_at: r.left_at,
         },
         r.display_name,
+        r.color,
       )
     })
     .collect())
