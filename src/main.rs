@@ -33,7 +33,7 @@ async fn main() -> anyhow::Result<()> {
 
   let state = AppState::new(db_pool, config.clone());
 
-  let app = Router::new().route("/", get(root)).with_state(state);
+  let app = routes::app_router(state);
 
   let addr = format!("{}:{}", config.host, config.port);
   let listener = tokio::net::TcpListener::bind(&addr).await?;
@@ -41,8 +41,4 @@ async fn main() -> anyhow::Result<()> {
   axum::serve(listener, app).await?;
 
   Ok(())
-}
-
-async fn root() -> &'static str {
-  "Welcome to the codesesh, babyyyy!"
 }
