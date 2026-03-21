@@ -4,6 +4,13 @@ pub mod config;
 pub mod errors;
 
 mod db;
+mod dto;
+mod handlers;
+mod middleware;
+mod models;
+mod repositories;
+mod routes;
+mod services;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
