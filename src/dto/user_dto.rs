@@ -10,7 +10,7 @@ pub struct CreateUserRequest {
   #[validate(length(
     min = 1,
     max = 100,
-    message = "display name must be between 1 and 50 characters"
+    message = "display name must be between 1 and 100 characters"
   ))]
   pub display_name: String,
 }

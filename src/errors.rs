@@ -313,6 +313,10 @@ impl From<RepoError> for AppError {
 
 #[derive(Debug, Error)]
 pub enum ServiceError {
+  /// Request payload failed business rules after serde/validator (e.g. trim → empty).
+  #[error("validation: {0}")]
+  Validation(String),
+
   #[error("forbidden")]
   Forbidden,
 
@@ -338,6 +342,7 @@ pub enum ServiceError {
 impl From<ServiceError> for AppError {
   fn from(e: ServiceError) -> Self {
     match e {
+      ServiceError::Validation(msg) => AppError::Validation(msg),
       ServiceError::Forbidden => AppError::Forbidden,
       ServiceError::SessionEnded => AppError::SessionEnded,
       ServiceError::SessionAlreadyEnded => AppError::SessionAlreadyEnded,

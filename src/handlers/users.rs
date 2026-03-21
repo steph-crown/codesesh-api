@@ -1,20 +1,24 @@
 use axum::extract::State;
-use uuid::Uuid;
+use validator::Validate;
 
 use crate::{
   dto::{CreateUserRequest, CreateUserResponse},
-  errors::AppResult,
+  errors::{AppError, AppResult},
   extractors::AppJson,
   response::ApiResponse,
+  services::user_service,
   state::AppState,
 };
 
 pub async fn create_user(
-  State(_state): State<AppState>,
+  State(state): State<AppState>,
   AppJson(payload): AppJson<CreateUserRequest>,
 ) -> AppResult<ApiResponse<CreateUserResponse>> {
-  Ok(ApiResponse::created(CreateUserResponse {
-    id: Uuid::nil(),
-    display_name: payload.display_name,
-  }))
+  payload
+    .validate()
+    .map_err(|e| AppError::Validation(e.to_string()))?;
+
+  let user = user_service::create_user(&state.db, payload).await?;
+
+  Ok(ApiResponse::created(CreateUserResponse::from(user)))
 }
