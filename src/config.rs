@@ -1,5 +1,6 @@
 use std::env;
 
+#[derive(Clone)]
 pub struct Config {
   // Server
   pub host: String,
