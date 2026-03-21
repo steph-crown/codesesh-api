@@ -23,7 +23,8 @@ CREATE TYPE session_language AS ENUM (
 
 CREATE TABLE sessions (
     id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    short_id         VARCHAR(10) NOT NULL,
+    -- Meet-style codes: `xxx-xxx-xxx` (11 chars); extra room for future formats.
+    short_id         VARCHAR(32) NOT NULL,
     host_id          UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     name             VARCHAR(255) NOT NULL,
     language         session_language NOT NULL DEFAULT 'typescript',

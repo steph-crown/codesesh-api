@@ -7,9 +7,7 @@ use crate::models::{Session, SessionLanguage};
 /// Meet-style code: three groups of three random English letters, hyphen-separated (`abc-def-ghi`).
 pub fn new_short_id() -> String {
   let mut rng = rand::thread_rng();
-  let mut chars: Vec<char> = (0..9)
-    .map(|_| rng.gen_range(b'a'..=b'z') as char)
-    .collect();
+  let mut chars: Vec<char> = (0..9).map(|_| rng.gen_range(b'a'..=b'z') as char).collect();
   chars.insert(3, '-');
   chars.insert(7, '-');
   chars.into_iter().collect()
