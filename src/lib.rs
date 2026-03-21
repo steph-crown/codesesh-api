@@ -22,11 +22,19 @@ pub async fn run() -> anyhow::Result<()> {
     .init();
 
   let config = config::Config::load()?;
+  tracing::info!(
+    host = %config.host,
+    port = config.port,
+    "configuration loaded",
+  );
+
   let db_pool = db::create_pool(&config)
     .await
     .map_err(|e| anyhow::anyhow!("Could not connect to database. Failed with error: {e}"))?;
+  tracing::info!("database connection pool ready");
 
   sqlx::migrate!("./migrations").run(&db_pool).await?;
+  tracing::info!("database migrations applied");
 
   let state = state::AppState::new(db_pool, config.clone());
 

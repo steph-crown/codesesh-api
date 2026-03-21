@@ -31,19 +31,43 @@ impl FromRequestParts<AppState> for AuthUser {
     parts: &mut Parts,
     state: &AppState,
   ) -> Result<Self, Self::Rejection> {
-    let raw = parts
-      .headers
-      .get(&X_USER_ID)
-      .ok_or(AppError::MissingUserId)?
-      .to_str()
-      .map_err(|_| AppError::InvalidUserId)?;
+    let raw = match parts.headers.get(&X_USER_ID) {
+      Some(v) => v,
+      None => {
+        tracing::debug!("rejecting request: missing X-User-Id header");
+        return Err(AppError::MissingUserId);
+      }
+    };
 
-    let id = Uuid::parse_str(raw.trim()).map_err(|_| AppError::InvalidUserId)?;
+    let raw = match raw.to_str() {
+      Ok(s) => s,
+      Err(_) => {
+        tracing::debug!("rejecting request: X-User-Id header is not valid UTF-8");
+        return Err(AppError::InvalidUserId);
+      }
+    };
 
-    let user = user_repo::find_by_id(&state.db, id)
-      .await
-      .map_err(AppError::from)?
-      .ok_or(AppError::UserNotFound)?;
+    let id = match Uuid::parse_str(raw.trim()) {
+      Ok(id) => id,
+      Err(_) => {
+        tracing::debug!("rejecting request: X-User-Id is not a valid UUID");
+        return Err(AppError::InvalidUserId);
+      }
+    };
+
+    let user = match user_repo::find_by_id(&state.db, id).await {
+      Ok(Some(user)) => user,
+      Ok(None) => {
+        tracing::debug!(user_id = %id, "rejecting request: no user for X-User-Id");
+        return Err(AppError::UserNotFound);
+      }
+      Err(e) => {
+        tracing::error!(error = %e, user_id = %id, "database error loading user for X-User-Id");
+        return Err(AppError::from(e));
+      }
+    };
+
+    tracing::trace!(user_id = %user.id, "authenticated request");
 
     Ok(AuthUser(user))
   }
