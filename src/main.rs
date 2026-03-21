@@ -1,4 +1,4 @@
-use axum::{Router, response::Html, routing::get};
+use axum::{Router, routing::get};
 use config::Config;
 use state::AppState;
 
@@ -33,7 +33,7 @@ async fn main() -> anyhow::Result<()> {
 
   let state = AppState::new(db_pool, config.clone());
 
-  let app = Router::new().route("/", get(root));
+  let app = Router::new().route("/", get(root)).with_state(state);
 
   let addr = format!("{}:{}", config.host, config.port);
   let listener = tokio::net::TcpListener::bind(&addr).await?;
