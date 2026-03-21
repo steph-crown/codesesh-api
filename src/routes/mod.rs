@@ -7,7 +7,7 @@ use crate::handlers::{
   execute::execute_code,
   health::health_check,
   messages::list_messages,
-  participants::{create_participant, list_participants},
+  participants::{create_participant, get_participation, list_participants},
   sessions::{
     create_session, end_session, get_session, list_sessions, update_session_name,
     update_session_visibility,
@@ -36,6 +36,10 @@ pub fn app_router(state: AppState) -> Router {
         .route(
           "/sessions/{short_id}/participants",
           get(list_participants),
+        )
+        .route(
+          "/sessions/{short_id}/participation",
+          get(get_participation),
         )
         .route("/sessions/{short_id}/join", post(create_participant))
         .route("/sessions/{short_id}/messages", get(list_messages))

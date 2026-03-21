@@ -57,6 +57,28 @@ pub async fn list_with_display_names(
     .collect())
 }
 
+/// Whether the user has an active (not left) participant row for this session.
+pub async fn is_active_participant(
+  pool: &PgPool,
+  session_id: Uuid,
+  user_id: Uuid,
+) -> Result<bool, sqlx::Error> {
+  let exists: bool = sqlx::query_scalar(
+    r#"
+    SELECT EXISTS(
+      SELECT 1
+      FROM session_participants
+      WHERE session_id = $1 AND user_id = $2 AND left_at IS NULL
+    )
+    "#,
+  )
+  .bind(session_id)
+  .bind(user_id)
+  .fetch_one(pool)
+  .await?;
+  Ok(exists)
+}
+
 /// Idempotent join: reactivate row if user already participated.
 pub async fn upsert_active(
   pool: &PgPool,

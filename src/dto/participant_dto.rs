@@ -5,6 +5,13 @@ use uuid::Uuid;
 
 // ─── Response DTOs ────────────────────────────────────────────────────────────
 
+/// `GET /sessions/:short_id/participation` — whether `X-User-Id` counts as a participant
+/// (host always does; others need an active `session_participants` row).
+#[derive(Debug, Serialize)]
+pub struct SessionParticipationResponse {
+  pub is_participant: bool,
+}
+
 /// Returned when listing participants in a session
 #[derive(Debug, Serialize)]
 pub struct ParticipantResponse {
