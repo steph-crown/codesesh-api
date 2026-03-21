@@ -79,6 +79,16 @@ async fn body_json(res: axum::response::Response) -> Value {
   serde_json::from_slice(&bytes).expect("json body")
 }
 
+/// Successful API envelope: `{ "success": true, "data": ... }` (see `response::ApiResponse`).
+fn unwrap_data(v: &Value) -> &Value {
+  assert_eq!(
+    v.get("success"),
+    Some(&json!(true)),
+    "expected success envelope, got {v}"
+  );
+  v.get("data").expect("data field")
+}
+
 fn session_path(suffix: &str) -> String {
   format!("/api/sessions/{SESSION_ID}{suffix}")
 }
@@ -95,11 +105,11 @@ async fn health_get_returns_ok_json() {
   let res = call(Method::GET, "/health", None, &[]).await;
   assert_eq!(res.status(), StatusCode::OK);
   let v = body_json(res).await;
-  assert_eq!(v["status"], json!("ok"));
+  assert_eq!(unwrap_data(&v)["status"], json!("ok"));
 }
 
 #[tokio::test]
-async fn post_users_valid_body_returns_200_and_shape() {
+async fn post_users_valid_body_returns_201_and_shape() {
   let res = call(
     Method::POST,
     "/api/users",
@@ -107,10 +117,11 @@ async fn post_users_valid_body_returns_200_and_shape() {
     &[],
   )
   .await;
-  assert_eq!(res.status(), StatusCode::OK);
+  assert_eq!(res.status(), StatusCode::CREATED);
   let v = body_json(res).await;
-  assert!(v.get("id").is_some());
-  assert_eq!(v["display_name"], json!("Ada"));
+  let d = unwrap_data(&v);
+  assert!(d.get("id").is_some());
+  assert_eq!(d["display_name"], json!("Ada"));
 }
 
 #[tokio::test]
@@ -118,10 +129,11 @@ async fn get_sessions_returns_paginated_shape() {
   let res = call(Method::GET, "/api/sessions", None, &[]).await;
   assert_eq!(res.status(), StatusCode::OK);
   let v = body_json(res).await;
+  let d = unwrap_data(&v);
   for key in ["data", "total", "page", "limit", "has_more"] {
     assert!(
-      v.get(key).is_some(),
-      "missing key {key} in {v}"
+      d.get(key).is_some(),
+      "missing key {key} in {d}"
     );
   }
 }
@@ -142,8 +154,9 @@ async fn post_sessions_valid_body_returns_detail_shape() {
     &[],
   )
   .await;
-  assert_eq!(res.status(), StatusCode::OK);
+  assert_eq!(res.status(), StatusCode::CREATED);
   let v = body_json(res).await;
+  let d = unwrap_data(&v);
   for key in [
     "id",
     "short_id",
@@ -158,7 +171,7 @@ async fn post_sessions_valid_body_returns_detail_shape() {
     "created_at",
     "updated_at",
   ] {
-    assert!(v.get(key).is_some(), "missing {key}");
+    assert!(d.get(key).is_some(), "missing {key}");
   }
 }
 
@@ -167,16 +180,20 @@ async fn get_session_by_id_returns_detail_shape() {
   let res = call(Method::GET, &session_path(""), None, &[]).await;
   assert_eq!(res.status(), StatusCode::OK);
   let v = body_json(res).await;
-  assert!(v.get("id").is_some(), "detail response should include id (stub may use nil UUID)");
+  assert!(
+    unwrap_data(&v).get("id").is_some(),
+    "detail response should include id (stub may use nil UUID)"
+  );
 }
 
 #[tokio::test]
 async fn post_join_returns_participant_shape() {
   let res = call(Method::POST, &session_path("/join"), None, &[]).await;
-  assert_eq!(res.status(), StatusCode::OK);
+  assert_eq!(res.status(), StatusCode::CREATED);
   let v = body_json(res).await;
+  let d = unwrap_data(&v);
   for key in ["user_id", "display_name", "joined_at", "is_active"] {
-    assert!(v.get(key).is_some(), "missing {key}");
+    assert!(d.get(key).is_some(), "missing {key}");
   }
 }
 
@@ -185,7 +202,7 @@ async fn get_participants_returns_array() {
   let res = call(Method::GET, &session_path("/participants"), None, &[]).await;
   assert_eq!(res.status(), StatusCode::OK);
   let v = body_json(res).await;
-  assert!(v.is_array());
+  assert!(unwrap_data(&v).is_array());
 }
 
 #[tokio::test]
@@ -199,7 +216,7 @@ async fn patch_session_name_returns_detail_shape() {
   .await;
   assert_eq!(res.status(), StatusCode::OK);
   let v = body_json(res).await;
-  assert!(v.get("name").is_some());
+  assert!(unwrap_data(&v).get("name").is_some());
 }
 
 #[tokio::test]
@@ -213,7 +230,7 @@ async fn patch_session_visibility_returns_detail_shape() {
   .await;
   assert_eq!(res.status(), StatusCode::OK);
   let v = body_json(res).await;
-  assert!(v.get("visibility").is_some());
+  assert!(unwrap_data(&v).get("visibility").is_some());
 }
 
 #[tokio::test]
@@ -221,7 +238,7 @@ async fn patch_session_end_returns_detail_shape() {
   let res = call(Method::PATCH, &session_path("/end"), None, &[]).await;
   assert_eq!(res.status(), StatusCode::OK);
   let v = body_json(res).await;
-  assert_eq!(v["status"], json!("ended"));
+  assert_eq!(unwrap_data(&v)["status"], json!("ended"));
 }
 
 #[tokio::test]
@@ -229,8 +246,9 @@ async fn get_messages_returns_history_shape() {
   let res = call(Method::GET, &session_path("/messages"), None, &[]).await;
   assert_eq!(res.status(), StatusCode::OK);
   let v = body_json(res).await;
-  assert!(v.get("messages").is_some());
-  assert!(v.get("has_more").is_some());
+  let d = unwrap_data(&v);
+  assert!(d.get("messages").is_some());
+  assert!(d.get("has_more").is_some());
 }
 
 #[tokio::test]
@@ -248,7 +266,7 @@ async fn post_execute_returns_json_object() {
   let res = call(Method::POST, &session_path("/execute"), None, &[]).await;
   assert_eq!(res.status(), StatusCode::OK);
   let v = body_json(res).await;
-  assert!(v.is_object());
+  assert!(unwrap_data(&v).is_object());
 }
 
 #[tokio::test]
