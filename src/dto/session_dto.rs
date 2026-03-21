@@ -47,7 +47,6 @@ pub struct GetSessionsQuery {
 
 #[derive(Debug, Deserialize, Validate)]
 pub struct GetMessagesQuery {
-  #[validate(range(min = 1, max = 100, message = "limit must be between 1 and 100"))]
   pub limit: Option<i64>,
   pub before: Option<Uuid>,
 }
@@ -85,15 +84,6 @@ pub struct SessionDetailResponse {
   pub last_activity_at: OffsetDateTime,
   pub created_at: OffsetDateTime,
   pub updated_at: OffsetDateTime,
-}
-
-/// Participant info embedded in session responses
-#[derive(Debug, Serialize)]
-pub struct ParticipantResponse {
-  pub user_id: Uuid,
-  pub display_name: String,
-  pub joined_at: OffsetDateTime,
-  pub is_active: bool,
 }
 
 /// Generic paginated list wrapper — reusable across any list endpoint
@@ -142,17 +132,6 @@ impl SessionDetailResponse {
       last_activity_at: session.last_activity_at,
       created_at: session.created_at,
       updated_at: session.updated_at,
-    }
-  }
-}
-
-impl ParticipantResponse {
-  pub fn from_participant(participant: SessionParticipant, user: &User) -> Self {
-    Self {
-      user_id: participant.user_id,
-      display_name: user.display_name.clone(),
-      joined_at: participant.joined_at,
-      is_active: participant.is_active(),
     }
   }
 }

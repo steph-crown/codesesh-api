@@ -9,7 +9,7 @@ use validator::Validate;
 pub struct CreateUserRequest {
   #[validate(length(
     min = 1,
-    max = 50,
+    max = 100,
     message = "display name must be between 1 and 50 characters"
   ))]
   pub display_name: String,
