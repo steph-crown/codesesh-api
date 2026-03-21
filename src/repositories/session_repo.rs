@@ -1,11 +1,18 @@
+use rand::Rng;
 use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::models::{Session, SessionLanguage};
 
-/// URL-safe short id for share links (matches `sessions.short_id` length).
+/// Meet-style code: three groups of three random English letters, hyphen-separated (`abc-def-ghi`).
 pub fn new_short_id() -> String {
-  nanoid::nanoid!(10)
+  let mut rng = rand::thread_rng();
+  let mut chars: Vec<char> = (0..9)
+    .map(|_| rng.gen_range(b'a'..=b'z') as char)
+    .collect();
+  chars.insert(3, '-');
+  chars.insert(7, '-');
+  chars.into_iter().collect()
 }
 
 fn is_unique_violation(e: &sqlx::Error) -> bool {
@@ -17,6 +24,16 @@ fn is_unique_violation(e: &sqlx::Error) -> bool {
 pub async fn find_by_id(pool: &PgPool, id: Uuid) -> Result<Option<Session>, sqlx::Error> {
   sqlx::query_as::<_, Session>("SELECT * FROM sessions WHERE id = $1")
     .bind(id)
+    .fetch_optional(pool)
+    .await
+}
+
+pub async fn find_by_short_id(
+  pool: &PgPool,
+  short_id: &str,
+) -> Result<Option<Session>, sqlx::Error> {
+  sqlx::query_as::<_, Session>("SELECT * FROM sessions WHERE short_id = $1")
+    .bind(short_id)
     .fetch_optional(pool)
     .await
 }

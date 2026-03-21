@@ -23,6 +23,47 @@ fn list_flags(query: &GetSessionsQuery) -> (bool, bool) {
   (created_only, shared_only)
 }
 
+/// Lowercase Meet-style session code: `^[a-z]{3}-[a-z]{3}-[a-z]{3}$` (e.g. `xqz-mnb-rtp`).
+pub fn is_meet_style_session_code(s: &str) -> bool {
+  let b = s.as_bytes();
+  if b.len() != 11 {
+    return false;
+  }
+  for i in 0..11 {
+    match i {
+      3 | 7 => {
+        if b[i] != b'-' {
+          return false;
+        }
+      }
+      _ => {
+        if !b[i].is_ascii_lowercase() {
+          return false;
+        }
+      }
+    }
+  }
+  true
+}
+
+/// Resolves a path `short_id` string to the internal session UUID (validates format, then DB).
+pub async fn resolve_session_id(pool: &PgPool, raw: &str) -> Result<Uuid, ServiceError> {
+  let code = raw.trim().to_lowercase();
+  if !is_meet_style_session_code(&code) {
+    return Err(ServiceError::Validation(
+      "session code must look like abc-def-ghi (three groups of three lowercase letters)"
+        .to_string(),
+    ));
+  }
+
+  let session = session_repo::find_by_short_id(pool, &code)
+    .await
+    .map_err(|e| ServiceError::Repo(RepoError::Database(e)))?
+    .ok_or(ServiceError::Repo(RepoError::NotFound))?;
+
+  Ok(session.id)
+}
+
 pub async fn create_session(
   pool: &PgPool,
   host_id: Uuid,
@@ -195,4 +236,23 @@ async fn load_session_for_mutation(
   }
 
   Ok(session)
+}
+
+#[cfg(test)]
+mod meet_code_tests {
+  use super::is_meet_style_session_code;
+
+  #[test]
+  fn accepts_lowercase_triplets() {
+    assert!(is_meet_style_session_code("abc-def-ghi"));
+    assert!(is_meet_style_session_code("zzz-yyy-xxx"));
+  }
+
+  #[test]
+  fn rejects_wrong_length_or_chars() {
+    assert!(!is_meet_style_session_code("abcd-efg-hij"));
+    assert!(!is_meet_style_session_code("ABC-DEF-GHI"));
+    assert!(!is_meet_style_session_code("ab-cd-ef"));
+    assert!(!is_meet_style_session_code(""));
+  }
 }

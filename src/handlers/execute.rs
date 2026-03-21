@@ -1,6 +1,5 @@
 use axum::extract::{Path, State};
 use serde_json::json;
-use uuid::Uuid;
 
 use crate::{
   errors::AppResult,
@@ -13,8 +12,9 @@ use crate::{
 pub async fn execute_code(
   State(state): State<AppState>,
   AuthUser(auth): AuthUser,
-  Path(session_id): Path<Uuid>,
+  Path(short_id): Path<String>,
 ) -> AppResult<ApiResponse<serde_json::Value>> {
+  let session_id = session_service::resolve_session_id(&state.db, &short_id).await?;
   session_service::ensure_session_for_execute(&state.db, session_id, auth.id).await?;
 
   Ok(ApiResponse::ok(json!({

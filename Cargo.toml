@@ -31,8 +31,8 @@ thiserror = "2.0.17"
 anyhow    = "1"
 
 # ── IDs ───────────────────────────────────────────────────────────────────────
-uuid   = { version = "1", features = ["v4", "serde"] }
-nanoid = "0.4"
+uuid = { version = "1", features = ["v4", "serde"] }
+rand = "0.8"
 
 # ── Concurrent in-memory state ────────────────────────────────────────────────
 dashmap = "6"

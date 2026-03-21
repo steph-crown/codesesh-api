@@ -26,21 +26,21 @@ pub fn app_router(state: AppState) -> Router {
         .route("/users/me", get(get_current_user))
         .route("/users", post(create_user))
         .route("/sessions", get(list_sessions).post(create_session))
-        .route("/sessions/{session_id}", get(get_session))
-        .route("/sessions/{session_id}/name", patch(update_session_name))
+        .route("/sessions/{short_id}", get(get_session))
+        .route("/sessions/{short_id}/name", patch(update_session_name))
         .route(
-          "/sessions/{session_id}/visibility",
+          "/sessions/{short_id}/visibility",
           patch(update_session_visibility),
         )
-        .route("/sessions/{session_id}/end", patch(end_session))
+        .route("/sessions/{short_id}/end", patch(end_session))
         .route(
-          "/sessions/{session_id}/participants",
+          "/sessions/{short_id}/participants",
           get(list_participants),
         )
-        .route("/sessions/{session_id}/join", post(create_participant))
-        .route("/sessions/{session_id}/messages", get(list_messages))
-        .route("/sessions/{session_id}/ws", get(session_websocket))
-        .route("/sessions/{session_id}/execute", post(execute_code)),
+        .route("/sessions/{short_id}/join", post(create_participant))
+        .route("/sessions/{short_id}/messages", get(list_messages))
+        .route("/sessions/{short_id}/ws", get(session_websocket))
+        .route("/sessions/{short_id}/execute", post(execute_code)),
     )
     .with_state(state)
 }

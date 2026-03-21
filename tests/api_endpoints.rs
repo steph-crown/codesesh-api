@@ -11,10 +11,10 @@ use std::sync::OnceLock;
 
 use axum::{
   body::Body,
-  http::{header, Method, Request, StatusCode},
+  http::{Method, Request, StatusCode, header},
 };
 use http_body_util::BodyExt;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tokio::sync::{Mutex, OnceCell};
 use tower::ServiceExt;
 
@@ -54,10 +54,7 @@ async fn call(
   body: Option<&str>,
   extra_headers: &[(&str, &str)],
 ) -> axum::response::Response {
-  let _lock = CALL_LOCK
-    .get_or_init(|| Mutex::new(()))
-    .lock()
-    .await;
+  let _lock = CALL_LOCK.get_or_init(|| Mutex::new(())).lock().await;
 
   let mut builder = Request::builder().method(method).uri(uri);
   if body.is_some() {
@@ -72,20 +69,11 @@ async fn call(
     Body::empty()
   };
   let req = builder.body(body).expect("request");
-  router()
-    .await
-    .oneshot(req)
-    .await
-    .expect("response")
+  router().await.oneshot(req).await.expect("response")
 }
 
 async fn body_json(res: axum::response::Response) -> Value {
-  let bytes = res
-    .into_body()
-    .collect()
-    .await
-    .expect("body")
-    .to_bytes();
+  let bytes = res.into_body().collect().await.expect("body").to_bytes();
   serde_json::from_slice(&bytes).expect("json body")
 }
 
@@ -113,24 +101,21 @@ fn unwrap_error(v: &Value) -> (&str, &str) {
   (code, message)
 }
 
-fn session_path(session_id: &str, suffix: &str) -> String {
-  format!("/api/sessions/{session_id}{suffix}")
+fn session_path(short_id: &str, suffix: &str) -> String {
+  format!("/api/sessions/{short_id}{suffix}")
 }
 
 async fn create_user() -> String {
   let res = call(
     Method::POST,
     "/api/users",
-    Some(r#"{"display_name":"ApiTestUser"}"#),
+    Some(r##"{"display_name":"ApiTestUser","color":"#336699"}"##),
     &[],
   )
   .await;
   assert_eq!(res.status(), StatusCode::CREATED);
   let v = body_json(res).await;
-  unwrap_data(&v)["id"]
-    .as_str()
-    .expect("user id")
-    .to_string()
+  unwrap_data(&v)["id"].as_str().expect("user id").to_string()
 }
 
 async fn create_session(user_id: &str) -> String {
@@ -143,9 +128,9 @@ async fn create_session(user_id: &str) -> String {
   .await;
   assert_eq!(res.status(), StatusCode::CREATED);
   let v = body_json(res).await;
-  unwrap_data(&v)["id"]
+  unwrap_data(&v)["short_id"]
     .as_str()
-    .expect("session id")
+    .expect("session short_id")
     .to_string()
 }
 
@@ -166,7 +151,7 @@ async fn post_users_valid_body_returns_201_and_shape() {
   let res = call(
     Method::POST,
     "/api/users",
-    Some(r#"{"display_name":"Ada"}"#),
+    Some(r##"{"display_name":"Ada","color":"#ff00aa"}"##),
     &[],
   )
   .await;
@@ -191,10 +176,7 @@ async fn get_sessions_returns_paginated_shape() {
   let v = body_json(res).await;
   let d = unwrap_data(&v);
   for key in ["data", "total", "page", "limit", "has_more"] {
-    assert!(
-      d.get(key).is_some(),
-      "missing key {key} in {d}"
-    );
+    assert!(d.get(key).is_some(), "missing key {key} in {d}");
   }
 }
 
@@ -202,8 +184,7 @@ async fn get_sessions_returns_paginated_shape() {
 async fn get_sessions_accepts_query_params() {
   let uid = create_user().await;
   let uri = "/api/sessions?search=foo&created_by_me=true&shared_with_me=false&page=2&limit=10";
-  let res = call(Method::GET, uri, None, &[("X-User-Id", uid.as_str())])
-    .await;
+  let res = call(Method::GET, uri, None, &[("X-User-Id", uid.as_str())]).await;
   assert_eq!(res.status(), StatusCode::OK);
 }
 
@@ -367,13 +348,7 @@ async fn get_messages_accepts_query_params() {
     "{}/messages?limit=25&before=00000000-0000-0000-0000-000000000099",
     session_path(&sid, "")
   );
-  let res = call(
-    Method::GET,
-    &uri,
-    None,
-    &[("X-User-Id", uid.as_str())],
-  )
-  .await;
+  let res = call(Method::GET, &uri, None, &[("X-User-Id", uid.as_str())]).await;
   assert_eq!(res.status(), StatusCode::OK);
 }
 
@@ -420,19 +395,16 @@ async fn wrong_method_post_health_returns_405() {
 }
 
 #[tokio::test]
-async fn invalid_uuid_in_session_path_returns_4xx() {
+async fn invalid_session_code_in_path_returns_400() {
+  let uid = create_user().await;
   let res = call(
     Method::GET,
-    "/api/sessions/not-a-uuid",
+    "/api/sessions/not-a-code",
     None,
-    &[],
+    &[("X-User-Id", uid.as_str())],
   )
   .await;
-  assert!(
-    res.status().is_client_error(),
-    "expected 4xx for invalid UUID path, got {}",
-    res.status()
-  );
+  assert_eq!(res.status(), StatusCode::BAD_REQUEST);
 }
 
 #[tokio::test]
@@ -458,8 +430,7 @@ async fn post_users_missing_field_returns_422_app_error_shape() {
   let (code, message) = unwrap_error(&v);
   assert_eq!(code, "INVALID_JSON_BODY");
   assert_eq!(
-    message,
-    "The request body could not be processed.",
+    message, "The request body could not be processed.",
     "client must not receive serde/field path details"
   );
 }
@@ -507,7 +478,7 @@ mod contract_pending {
     let uid = create_user().await;
     let res = call(
       Method::GET,
-      "/api/sessions/11111111-1111-1111-1111-111111111111",
+      "/api/sessions/zzz-yyy-xxx",
       None,
       &[("X-User-Id", uid.as_str())],
     )

@@ -1,5 +1,4 @@
 use axum::extract::{Path, Query, State};
-use uuid::Uuid;
 use validator::Validate;
 
 use crate::{
@@ -43,8 +42,9 @@ pub async fn list_sessions(
 pub async fn get_session(
   State(state): State<AppState>,
   AuthUser(auth): AuthUser,
-  Path(session_id): Path<Uuid>,
+  Path(short_id): Path<String>,
 ) -> AppResult<ApiResponse<SessionDetailResponse>> {
+  let session_id = session_service::resolve_session_id(&state.db, &short_id).await?;
   let res = session_service::get_session(&state.db, session_id, auth.id).await?;
   Ok(ApiResponse::ok(res))
 }
@@ -52,13 +52,14 @@ pub async fn get_session(
 pub async fn update_session_name(
   State(state): State<AppState>,
   AuthUser(auth): AuthUser,
-  Path(session_id): Path<Uuid>,
+  Path(short_id): Path<String>,
   AppJson(payload): AppJson<UpdateSessionNameRequest>,
 ) -> AppResult<ApiResponse<SessionDetailResponse>> {
   payload
     .validate()
     .map_err(|e| AppError::Validation(e.to_string()))?;
 
+  let session_id = session_service::resolve_session_id(&state.db, &short_id).await?;
   let res =
     session_service::update_session_name(&state.db, session_id, auth.id, payload).await?;
 
@@ -68,9 +69,10 @@ pub async fn update_session_name(
 pub async fn update_session_visibility(
   State(state): State<AppState>,
   AuthUser(auth): AuthUser,
-  Path(session_id): Path<Uuid>,
+  Path(short_id): Path<String>,
   AppJson(payload): AppJson<UpdateSessionVisibilityRequest>,
 ) -> AppResult<ApiResponse<SessionDetailResponse>> {
+  let session_id = session_service::resolve_session_id(&state.db, &short_id).await?;
   let res =
     session_service::update_session_visibility(&state.db, session_id, auth.id, payload).await?;
 
@@ -80,8 +82,9 @@ pub async fn update_session_visibility(
 pub async fn end_session(
   State(state): State<AppState>,
   AuthUser(auth): AuthUser,
-  Path(session_id): Path<Uuid>,
+  Path(short_id): Path<String>,
 ) -> AppResult<ApiResponse<SessionDetailResponse>> {
+  let session_id = session_service::resolve_session_id(&state.db, &short_id).await?;
   let res = session_service::end_session(&state.db, session_id, auth.id).await?;
   Ok(ApiResponse::ok(res))
 }
