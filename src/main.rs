@@ -13,5 +13,7 @@ async fn main() -> anyhow::Result<()> {
     .await
     .map_err(|e| anyhow::anyhow!("Could not connect to database. Failed with error: {e}"))?;
 
+  sqlx::migrate!("./migrations").run(&db_pool).await?;
+
   Ok(())
 }
