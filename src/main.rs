@@ -1,6 +1,7 @@
 use config::Config;
 
 pub mod config;
+pub mod errors;
 
 fn main() -> anyhow::Result<()> {
   let _ = dotenvy::dotenv();
