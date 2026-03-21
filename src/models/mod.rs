@@ -1,3 +1,9 @@
-pub mod message;
-pub mod session;
-pub mod user;
+mod message;
+mod participant;
+mod session;
+mod user;
+
+pub use message::ChatMessage;
+pub use participant::SessionParticipant;
+pub use session::{Session, SessionStatus, SessionVisibility};
+pub use user::User;
