@@ -1,29 +1,29 @@
 use axum::extract::{Path, State};
-use time::OffsetDateTime;
 use uuid::Uuid;
 
 use crate::{
   dto::ParticipantResponse,
   errors::AppResult,
+  extractors::AuthUser,
   response::ApiResponse,
+  services::participant_service,
   state::AppState,
 };
 
 pub async fn list_participants(
-  State(_state): State<AppState>,
-  Path(_session_id): Path<Uuid>,
+  State(state): State<AppState>,
+  AuthUser(auth): AuthUser,
+  Path(session_id): Path<Uuid>,
 ) -> AppResult<ApiResponse<Vec<ParticipantResponse>>> {
-  Ok(ApiResponse::ok(vec![]))
+  let res = participant_service::list_participants(&state.db, session_id, auth.id).await?;
+  Ok(ApiResponse::ok(res))
 }
 
 pub async fn create_participant(
-  State(_state): State<AppState>,
-  Path(_session_id): Path<Uuid>,
+  State(state): State<AppState>,
+  AuthUser(auth): AuthUser,
+  Path(session_id): Path<Uuid>,
 ) -> AppResult<ApiResponse<ParticipantResponse>> {
-  Ok(ApiResponse::created(ParticipantResponse {
-    user_id: Uuid::nil(),
-    display_name: String::new(),
-    joined_at: OffsetDateTime::UNIX_EPOCH,
-    is_active: true,
-  }))
+  let res = participant_service::join_session(&state.db, session_id, auth.id).await?;
+  Ok(ApiResponse::created(res))
 }

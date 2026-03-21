@@ -25,7 +25,7 @@ pub async fn create_user(pool: &PgPool, req: CreateUserRequest) -> Result<User, 
     .await
     .map_err(|e| ServiceError::Repo(RepoError::Database(e)))?;
 
-  tracing::info!(user_id = %user.id, "user created");
+  tracing::info!("user created");
 
   Ok(user)
 }

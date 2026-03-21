@@ -1,9 +1,7 @@
 // src/dto/message_dto.rs
-use crate::models::ChatMessage;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use time::OffsetDateTime;
 use uuid::Uuid;
-use validator::Validate;
 
 // ─── Request ──────────────────────────────────────────────────────────────────
 

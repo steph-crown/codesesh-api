@@ -58,16 +58,14 @@ impl FromRequestParts<AppState> for AuthUser {
     let user = match user_repo::find_by_id(&state.db, id).await {
       Ok(Some(user)) => user,
       Ok(None) => {
-        tracing::debug!(user_id = %id, "rejecting request: no user for X-User-Id");
+        tracing::debug!("rejecting request: X-User-Id does not match a user");
         return Err(AppError::UserNotFound);
       }
       Err(e) => {
-        tracing::error!(error = %e, user_id = %id, "database error loading user for X-User-Id");
+        tracing::error!(error = %e, "database error loading auth user");
         return Err(AppError::from(e));
       }
     };
-
-    tracing::trace!(user_id = %user.id, "authenticated request");
 
     Ok(AuthUser(user))
   }

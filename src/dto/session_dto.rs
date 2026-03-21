@@ -1,7 +1,5 @@
 // src/dto/session_dto.rs
-use crate::models::{
-  Session, SessionLanguage, SessionParticipant, SessionStatus, SessionVisibility, User,
-};
+use crate::models::{Session, SessionLanguage, SessionStatus, SessionVisibility};
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 use uuid::Uuid;

@@ -1,84 +1,87 @@
 use axum::extract::{Path, Query, State};
-use time::OffsetDateTime;
 use uuid::Uuid;
+use validator::Validate;
 
 use crate::{
   dto::{
     CreateSessionRequest, GetSessionsQuery, PaginatedResponse, SessionDetailResponse,
     SessionSummaryResponse, UpdateSessionNameRequest, UpdateSessionVisibilityRequest,
   },
-  errors::AppResult,
-  extractors::AppJson,
-  models::{SessionLanguage, SessionStatus, SessionVisibility},
+  errors::{AppError, AppResult},
+  extractors::{AppJson, AuthUser},
   response::ApiResponse,
+  services::session_service,
   state::AppState,
 };
 
-fn stub_session_detail() -> SessionDetailResponse {
-  SessionDetailResponse {
-    id: Uuid::nil(),
-    short_id: "stub".to_string(),
-    name: "stub".to_string(),
-    language: SessionLanguage::TypeScript,
-    visibility: SessionVisibility::Edit,
-    status: SessionStatus::Active,
-    content: String::new(),
-    event_count: 0,
-    is_owner: false,
-    last_activity_at: OffsetDateTime::UNIX_EPOCH,
-    created_at: OffsetDateTime::UNIX_EPOCH,
-    updated_at: OffsetDateTime::UNIX_EPOCH,
-  }
-}
-
 pub async fn create_session(
-  State(_state): State<AppState>,
-  AppJson(_payload): AppJson<CreateSessionRequest>,
+  State(state): State<AppState>,
+  AuthUser(auth): AuthUser,
+  AppJson(payload): AppJson<CreateSessionRequest>,
 ) -> AppResult<ApiResponse<SessionDetailResponse>> {
-  Ok(ApiResponse::created(stub_session_detail()))
+  payload
+    .validate()
+    .map_err(|e| AppError::Validation(e.to_string()))?;
+
+  let session = session_service::create_session(&state.db, auth.id, payload).await?;
+
+  Ok(ApiResponse::created(SessionDetailResponse::from_session(
+    session,
+    auth.id,
+  )))
 }
 
 pub async fn list_sessions(
-  State(_state): State<AppState>,
-  Query(_query): Query<GetSessionsQuery>,
+  State(state): State<AppState>,
+  AuthUser(auth): AuthUser,
+  Query(query): Query<GetSessionsQuery>,
 ) -> AppResult<ApiResponse<PaginatedResponse<SessionSummaryResponse>>> {
-  Ok(ApiResponse::ok(PaginatedResponse {
-    data: vec![],
-    total: 0,
-    page: 1,
-    limit: 20,
-    has_more: false,
-  }))
+  let res = session_service::list_sessions(&state.db, auth.id, query).await?;
+  Ok(ApiResponse::ok(res))
 }
 
 pub async fn get_session(
-  State(_state): State<AppState>,
-  Path(_session_id): Path<Uuid>,
+  State(state): State<AppState>,
+  AuthUser(auth): AuthUser,
+  Path(session_id): Path<Uuid>,
 ) -> AppResult<ApiResponse<SessionDetailResponse>> {
-  Ok(ApiResponse::ok(stub_session_detail()))
+  let res = session_service::get_session(&state.db, session_id, auth.id).await?;
+  Ok(ApiResponse::ok(res))
 }
 
 pub async fn update_session_name(
-  State(_state): State<AppState>,
-  Path(_session_id): Path<Uuid>,
-  AppJson(_payload): AppJson<UpdateSessionNameRequest>,
+  State(state): State<AppState>,
+  AuthUser(auth): AuthUser,
+  Path(session_id): Path<Uuid>,
+  AppJson(payload): AppJson<UpdateSessionNameRequest>,
 ) -> AppResult<ApiResponse<SessionDetailResponse>> {
-  Ok(ApiResponse::ok(stub_session_detail()))
+  payload
+    .validate()
+    .map_err(|e| AppError::Validation(e.to_string()))?;
+
+  let res =
+    session_service::update_session_name(&state.db, session_id, auth.id, payload).await?;
+
+  Ok(ApiResponse::ok(res))
 }
 
 pub async fn update_session_visibility(
-  State(_state): State<AppState>,
-  Path(_session_id): Path<Uuid>,
-  AppJson(_payload): AppJson<UpdateSessionVisibilityRequest>,
+  State(state): State<AppState>,
+  AuthUser(auth): AuthUser,
+  Path(session_id): Path<Uuid>,
+  AppJson(payload): AppJson<UpdateSessionVisibilityRequest>,
 ) -> AppResult<ApiResponse<SessionDetailResponse>> {
-  Ok(ApiResponse::ok(stub_session_detail()))
+  let res =
+    session_service::update_session_visibility(&state.db, session_id, auth.id, payload).await?;
+
+  Ok(ApiResponse::ok(res))
 }
 
 pub async fn end_session(
-  State(_state): State<AppState>,
-  Path(_session_id): Path<Uuid>,
+  State(state): State<AppState>,
+  AuthUser(auth): AuthUser,
+  Path(session_id): Path<Uuid>,
 ) -> AppResult<ApiResponse<SessionDetailResponse>> {
-  let mut body = stub_session_detail();
-  body.status = SessionStatus::Ended;
-  Ok(ApiResponse::ok(body))
+  let res = session_service::end_session(&state.db, session_id, auth.id).await?;
+  Ok(ApiResponse::ok(res))
 }

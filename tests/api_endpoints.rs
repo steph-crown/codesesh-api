@@ -7,13 +7,15 @@
 //! `.cursor/project.mdc`. Run them with `cargo test --test api_endpoints -- --ignored`.
 //! **Smoke** tests should pass against the current stub handlers.
 
+use std::sync::OnceLock;
+
 use axum::{
   body::Body,
   http::{header, Method, Request, StatusCode},
 };
 use http_body_util::BodyExt;
 use serde_json::{json, Value};
-use tokio::sync::OnceCell;
+use tokio::sync::{Mutex, OnceCell};
 use tower::ServiceExt;
 
 use codesesh_api::{config::Config, db, routes, state::AppState};
@@ -21,6 +23,9 @@ use codesesh_api::{config::Config, db, routes, state::AppState};
 // ─── shared router (one pool + migrations per test process) ─────────────────
 
 static ROUTER: OnceCell<axum::Router> = OnceCell::const_new();
+
+/// Serialize DB-backed requests so the shared pool is not exhausted under parallel tests.
+static CALL_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 
 async fn router() -> axum::Router {
   ROUTER
@@ -49,6 +54,11 @@ async fn call(
   body: Option<&str>,
   extra_headers: &[(&str, &str)],
 ) -> axum::response::Response {
+  let _lock = CALL_LOCK
+    .get_or_init(|| Mutex::new(()))
+    .lock()
+    .await;
+
   let mut builder = Request::builder().method(method).uri(uri);
   if body.is_some() {
     builder = builder.header(header::CONTENT_TYPE, "application/json");
@@ -103,12 +113,41 @@ fn unwrap_error(v: &Value) -> (&str, &str) {
   (code, message)
 }
 
-fn session_path(suffix: &str) -> String {
-  format!("/api/sessions/{SESSION_ID}{suffix}")
+fn session_path(session_id: &str, suffix: &str) -> String {
+  format!("/api/sessions/{session_id}{suffix}")
 }
 
-const SESSION_ID: &str = "00000000-0000-0000-0000-0000000000a1";
-const USER_HEADER_ID: &str = "00000000-0000-0000-0000-0000000000b2";
+async fn create_user() -> String {
+  let res = call(
+    Method::POST,
+    "/api/users",
+    Some(r#"{"display_name":"ApiTestUser"}"#),
+    &[],
+  )
+  .await;
+  assert_eq!(res.status(), StatusCode::CREATED);
+  let v = body_json(res).await;
+  unwrap_data(&v)["id"]
+    .as_str()
+    .expect("user id")
+    .to_string()
+}
+
+async fn create_session(user_id: &str) -> String {
+  let res = call(
+    Method::POST,
+    "/api/sessions",
+    Some(r#"{"name":"Pairing","language":"typescript"}"#),
+    &[("X-User-Id", user_id)],
+  )
+  .await;
+  assert_eq!(res.status(), StatusCode::CREATED);
+  let v = body_json(res).await;
+  unwrap_data(&v)["id"]
+    .as_str()
+    .expect("session id")
+    .to_string()
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Smoke — should pass with stub handlers (happy path / routing)
@@ -140,7 +179,14 @@ async fn post_users_valid_body_returns_201_and_shape() {
 
 #[tokio::test]
 async fn get_sessions_returns_paginated_shape() {
-  let res = call(Method::GET, "/api/sessions", None, &[]).await;
+  let uid = create_user().await;
+  let res = call(
+    Method::GET,
+    "/api/sessions",
+    None,
+    &[("X-User-Id", uid.as_str())],
+  )
+  .await;
   assert_eq!(res.status(), StatusCode::OK);
   let v = body_json(res).await;
   let d = unwrap_data(&v);
@@ -154,18 +200,21 @@ async fn get_sessions_returns_paginated_shape() {
 
 #[tokio::test]
 async fn get_sessions_accepts_query_params() {
+  let uid = create_user().await;
   let uri = "/api/sessions?search=foo&created_by_me=true&shared_with_me=false&page=2&limit=10";
-  let res = call(Method::GET, uri, None, &[]).await;
+  let res = call(Method::GET, uri, None, &[("X-User-Id", uid.as_str())])
+    .await;
   assert_eq!(res.status(), StatusCode::OK);
 }
 
 #[tokio::test]
 async fn post_sessions_valid_body_returns_detail_shape() {
+  let uid = create_user().await;
   let res = call(
     Method::POST,
     "/api/sessions",
     Some(r#"{"name":"Pairing","language":"typescript"}"#),
-    &[],
+    &[("X-User-Id", uid.as_str())],
   )
   .await;
   assert_eq!(res.status(), StatusCode::CREATED);
@@ -191,7 +240,15 @@ async fn post_sessions_valid_body_returns_detail_shape() {
 
 #[tokio::test]
 async fn get_session_by_id_returns_detail_shape() {
-  let res = call(Method::GET, &session_path(""), None, &[]).await;
+  let uid = create_user().await;
+  let sid = create_session(&uid).await;
+  let res = call(
+    Method::GET,
+    &session_path(&sid, ""),
+    None,
+    &[("X-User-Id", uid.as_str())],
+  )
+  .await;
   assert_eq!(res.status(), StatusCode::OK);
   let v = body_json(res).await;
   assert!(
@@ -202,7 +259,16 @@ async fn get_session_by_id_returns_detail_shape() {
 
 #[tokio::test]
 async fn post_join_returns_participant_shape() {
-  let res = call(Method::POST, &session_path("/join"), None, &[]).await;
+  let host = create_user().await;
+  let guest = create_user().await;
+  let sid = create_session(&host).await;
+  let res = call(
+    Method::POST,
+    &session_path(&sid, "/join"),
+    None,
+    &[("X-User-Id", guest.as_str())],
+  )
+  .await;
   assert_eq!(res.status(), StatusCode::CREATED);
   let v = body_json(res).await;
   let d = unwrap_data(&v);
@@ -213,7 +279,15 @@ async fn post_join_returns_participant_shape() {
 
 #[tokio::test]
 async fn get_participants_returns_array() {
-  let res = call(Method::GET, &session_path("/participants"), None, &[]).await;
+  let uid = create_user().await;
+  let sid = create_session(&uid).await;
+  let res = call(
+    Method::GET,
+    &session_path(&sid, "/participants"),
+    None,
+    &[("X-User-Id", uid.as_str())],
+  )
+  .await;
   assert_eq!(res.status(), StatusCode::OK);
   let v = body_json(res).await;
   assert!(unwrap_data(&v).is_array());
@@ -221,11 +295,13 @@ async fn get_participants_returns_array() {
 
 #[tokio::test]
 async fn patch_session_name_returns_detail_shape() {
+  let uid = create_user().await;
+  let sid = create_session(&uid).await;
   let res = call(
     Method::PATCH,
-    &session_path("/name"),
+    &session_path(&sid, "/name"),
     Some(r#"{"name":"Renamed"}"#),
-    &[],
+    &[("X-User-Id", uid.as_str())],
   )
   .await;
   assert_eq!(res.status(), StatusCode::OK);
@@ -235,11 +311,13 @@ async fn patch_session_name_returns_detail_shape() {
 
 #[tokio::test]
 async fn patch_session_visibility_returns_detail_shape() {
+  let uid = create_user().await;
+  let sid = create_session(&uid).await;
   let res = call(
     Method::PATCH,
-    &session_path("/visibility"),
+    &session_path(&sid, "/visibility"),
     Some(r#"{"visibility":"private"}"#),
-    &[],
+    &[("X-User-Id", uid.as_str())],
   )
   .await;
   assert_eq!(res.status(), StatusCode::OK);
@@ -249,7 +327,15 @@ async fn patch_session_visibility_returns_detail_shape() {
 
 #[tokio::test]
 async fn patch_session_end_returns_detail_shape() {
-  let res = call(Method::PATCH, &session_path("/end"), None, &[]).await;
+  let uid = create_user().await;
+  let sid = create_session(&uid).await;
+  let res = call(
+    Method::PATCH,
+    &session_path(&sid, "/end"),
+    None,
+    &[("X-User-Id", uid.as_str())],
+  )
+  .await;
   assert_eq!(res.status(), StatusCode::OK);
   let v = body_json(res).await;
   assert_eq!(unwrap_data(&v)["status"], json!("ended"));
@@ -257,7 +343,15 @@ async fn patch_session_end_returns_detail_shape() {
 
 #[tokio::test]
 async fn get_messages_returns_history_shape() {
-  let res = call(Method::GET, &session_path("/messages"), None, &[]).await;
+  let uid = create_user().await;
+  let sid = create_session(&uid).await;
+  let res = call(
+    Method::GET,
+    &session_path(&sid, "/messages"),
+    None,
+    &[("X-User-Id", uid.as_str())],
+  )
+  .await;
   assert_eq!(res.status(), StatusCode::OK);
   let v = body_json(res).await;
   let d = unwrap_data(&v);
@@ -267,17 +361,33 @@ async fn get_messages_returns_history_shape() {
 
 #[tokio::test]
 async fn get_messages_accepts_query_params() {
+  let uid = create_user().await;
+  let sid = create_session(&uid).await;
   let uri = format!(
     "{}/messages?limit=25&before=00000000-0000-0000-0000-000000000099",
-    session_path("")
+    session_path(&sid, "")
   );
-  let res = call(Method::GET, &uri, None, &[]).await;
+  let res = call(
+    Method::GET,
+    &uri,
+    None,
+    &[("X-User-Id", uid.as_str())],
+  )
+  .await;
   assert_eq!(res.status(), StatusCode::OK);
 }
 
 #[tokio::test]
 async fn post_execute_returns_json_object() {
-  let res = call(Method::POST, &session_path("/execute"), None, &[]).await;
+  let uid = create_user().await;
+  let sid = create_session(&uid).await;
+  let res = call(
+    Method::POST,
+    &session_path(&sid, "/execute"),
+    None,
+    &[("X-User-Id", uid.as_str())],
+  )
+  .await;
   assert_eq!(res.status(), StatusCode::OK);
   let v = body_json(res).await;
   assert!(unwrap_data(&v).is_object());
@@ -285,7 +395,15 @@ async fn post_execute_returns_json_object() {
 
 #[tokio::test]
 async fn get_ws_is_routed() {
-  let res = call(Method::GET, &session_path("/ws"), None, &[]).await;
+  let uid = create_user().await;
+  let sid = create_session(&uid).await;
+  let res = call(
+    Method::GET,
+    &session_path(&sid, "/ws"),
+    None,
+    &[("X-User-Id", uid.as_str())],
+  )
+  .await;
   let s = res.status();
   assert_ne!(s, StatusCode::NOT_FOUND);
   assert_ne!(s, StatusCode::METHOD_NOT_ALLOWED);
@@ -339,9 +457,10 @@ async fn post_users_missing_field_returns_422_app_error_shape() {
   let v = body_json(res).await;
   let (code, message) = unwrap_error(&v);
   assert_eq!(code, "INVALID_JSON_BODY");
-  assert!(
-    message.contains("display_name"),
-    "expected message to mention missing field, got {message:?}"
+  assert_eq!(
+    message,
+    "The request body could not be processed.",
+    "client must not receive serde/field path details"
   );
 }
 
@@ -353,14 +472,15 @@ async fn post_users_missing_field_returns_422_app_error_shape() {
 mod contract_pending {
   use axum::http::{Method, StatusCode};
 
-  use super::{call, session_path, USER_HEADER_ID};
+  use super::{call, create_session, create_user, session_path};
 
   #[tokio::test]
-  #[ignore = "Phase 3: require X-User-Id on protected routes"]
   async fn session_mutations_require_x_user_id() {
+    let uid = create_user().await;
+    let sid = create_session(&uid).await;
     let res = call(
       Method::PATCH,
-      &session_path("/name"),
+      &session_path(&sid, "/name"),
       Some(r#"{"name":"x"}"#),
       &[],
     )
@@ -369,11 +489,12 @@ mod contract_pending {
   }
 
   #[tokio::test]
-  #[ignore = "Phase 3: valid X-User-Id must exist in users table"]
   async fn unknown_user_id_returns_401() {
+    let uid = create_user().await;
+    let sid = create_session(&uid).await;
     let res = call(
       Method::GET,
-      &session_path(""),
+      &session_path(&sid, ""),
       None,
       &[("X-User-Id", "00000000-0000-0000-0000-00000000c001")],
     )
@@ -382,26 +503,35 @@ mod contract_pending {
   }
 
   #[tokio::test]
-  #[ignore = "Return 404 when session id does not exist"]
   async fn get_unknown_session_returns_404() {
+    let uid = create_user().await;
     let res = call(
       Method::GET,
       "/api/sessions/11111111-1111-1111-1111-111111111111",
       None,
-      &[("X-User-Id", USER_HEADER_ID)],
+      &[("X-User-Id", uid.as_str())],
     )
     .await;
     assert_eq!(res.status(), StatusCode::NOT_FOUND);
   }
 
   #[tokio::test]
-  #[ignore = "Return 410 when session has ended"]
   async fn mutations_on_ended_session_return_410() {
+    let uid = create_user().await;
+    let sid = create_session(&uid).await;
+    let end = call(
+      Method::PATCH,
+      &session_path(&sid, "/end"),
+      None,
+      &[("X-User-Id", uid.as_str())],
+    )
+    .await;
+    assert_eq!(end.status(), StatusCode::OK);
     let res = call(
       Method::PATCH,
-      &session_path("/name"),
+      &session_path(&sid, "/name"),
       Some(r#"{"name":"nope"}"#),
-      &[("X-User-Id", USER_HEADER_ID)],
+      &[("X-User-Id", uid.as_str())],
     )
     .await;
     assert_eq!(res.status(), StatusCode::GONE);
@@ -421,13 +551,24 @@ mod contract_pending {
   }
 
   #[tokio::test]
-  #[ignore = "Private session: non-owner cannot read"]
+  #[ignore = "Private session: non-owner cannot read — needs host + other user + PATCH visibility"]
   async fn get_private_session_forbidden_for_non_owner() {
+    let host = create_user().await;
+    let other = create_user().await;
+    let sid = create_session(&host).await;
+    let patch = call(
+      Method::PATCH,
+      &session_path(&sid, "/visibility"),
+      Some(r#"{"visibility":"private"}"#),
+      &[("X-User-Id", host.as_str())],
+    )
+    .await;
+    assert_eq!(patch.status(), StatusCode::OK);
     let res = call(
       Method::GET,
-      &session_path(""),
+      &session_path(&sid, ""),
       None,
-      &[("X-User-Id", USER_HEADER_ID)],
+      &[("X-User-Id", other.as_str())],
     )
     .await;
     assert_eq!(res.status(), StatusCode::FORBIDDEN);

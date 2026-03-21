@@ -121,10 +121,20 @@ impl IntoResponse for AppError {
       // 400
       AppError::Validation(msg) => (StatusCode::BAD_REQUEST, "VALIDATION_ERROR", msg.as_str()),
       AppError::InvalidJsonSyntax(msg) => {
-        (StatusCode::BAD_REQUEST, "INVALID_JSON_SYNTAX", msg.as_str())
+        tracing::debug!(detail = %msg, "invalid JSON syntax in request body");
+        (
+          StatusCode::BAD_REQUEST,
+          "INVALID_JSON_SYNTAX",
+          "The request body is not valid JSON.",
+        )
       }
       AppError::RequestBodyBufferFailed(msg) => {
-        (StatusCode::BAD_REQUEST, "REQUEST_BODY_ERROR", msg.as_str())
+        tracing::debug!(detail = %msg, "request body buffer failed");
+        (
+          StatusCode::BAD_REQUEST,
+          "REQUEST_BODY_ERROR",
+          "The request body could not be read.",
+        )
       }
       AppError::InvalidWsMessage => (
         StatusCode::BAD_REQUEST,
@@ -208,11 +218,14 @@ impl IntoResponse for AppError {
       ),
 
       // 422
-      AppError::InvalidJsonBody(msg) => (
-        StatusCode::UNPROCESSABLE_ENTITY,
-        "INVALID_JSON_BODY",
-        msg.as_str(),
-      ),
+      AppError::InvalidJsonBody(msg) => {
+        tracing::debug!(detail = %msg, "JSON body did not match expected shape");
+        (
+          StatusCode::UNPROCESSABLE_ENTITY,
+          "INVALID_JSON_BODY",
+          "The request body could not be processed.",
+        )
+      }
       AppError::SessionEventCapReached => (
         StatusCode::UNPROCESSABLE_ENTITY,
         "EVENT_CAP_REACHED",
@@ -231,12 +244,12 @@ impl IntoResponse for AppError {
         "Code execution returned an unexpected response",
       ),
 
-      // 500
+      // 500 — never expose error details or traces to the client
       AppError::Database(e) => {
         tracing::error!(error = %e, "database error");
         (
           StatusCode::INTERNAL_SERVER_ERROR,
-          "DATABASE_ERROR",
+          "INTERNAL_ERROR",
           "An internal error occurred",
         )
       }
