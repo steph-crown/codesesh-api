@@ -4,3 +4,59 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+# ── Web framework ─────────────────────────────────────────────────────────────
+axum            = { version = "0.8.8", features = ["ws", "macros"] }
+tokio           = { version = "1",     features = ["full"] }
+tower           = { version = "0.5",   features = ["full"] }
+tower-http      = { version = "0.6",   features = ["cors", "trace", "request-id", "timeout"] }
+tower_governor  = "0.7"
+
+# ── Database ──────────────────────────────────────────────────────────────────
+sqlx = { version = "0.8", features = [
+    "runtime-tokio",
+    "postgres",
+    "uuid",
+    "time",
+    "json",
+    "migrate",
+]}
+
+# ── Serialization ─────────────────────────────────────────────────────────────
+serde      = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# ── Error handling ────────────────────────────────────────────────────────────
+thiserror = "2.0.17"
+anyhow    = "1"
+
+# ── IDs ───────────────────────────────────────────────────────────────────────
+uuid   = { version = "1", features = ["v4", "serde"] }
+nanoid = "0.4"
+
+# ── Concurrent in-memory state ────────────────────────────────────────────────
+dashmap = "6"
+
+# ── Validation ────────────────────────────────────────────────────────────────
+validator = { version = "0.19", features = ["derive"] }
+
+# ── Time ──────────────────────────────────────────────────────────────────────
+time = { version = "0.3", features = ["serde"] }
+
+# ── HTTP client (Judge0 proxy) ────────────────────────────────────────────────
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+
+# ── Async utilities ───────────────────────────────────────────────────────────
+async-trait = "0.1"
+futures     = "0.3"
+
+# ── Logging / tracing ─────────────────────────────────────────────────────────
+tracing            = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# ── Environment / config ──────────────────────────────────────────────────────
+dotenvy = "0.15"
+
+[dev-dependencies]
+tokio     = { version = "1", features = ["full", "test-util"] }
+sqlx      = { version = "0.8", features = ["runtime-tokio", "postgres", "macros", "migrate"] }
+axum-test = "19.1.1"
