@@ -1,6 +1,7 @@
 // errors.rs
 use axum::{
   Json,
+  extract::rejection::{BytesRejection, FailedToBufferBody, JsonRejection},
   http::StatusCode,
   response::{IntoResponse, Response},
 };
@@ -31,6 +32,27 @@ pub enum AppError {
   /// Request body failed validator derive checks (name too long, empty, etc.)
   #[error("validation error: {0}")]
   Validation(String),
+
+  // ── JSON body (Axum `Json` / `AppJson`) ───────────────────────────────────
+  /// JSON parsed but does not match the expected shape (missing fields, wrong types).
+  #[error("{0}")]
+  InvalidJsonBody(String),
+
+  /// JSON syntax error or trailing garbage after a value.
+  #[error("{0}")]
+  InvalidJsonSyntax(String),
+
+  /// `Content-Type` was not `application/json` (or compatible).
+  #[error("expected JSON request body")]
+  JsonContentTypeRequired,
+
+  /// Request body exceeded the configured size limit.
+  #[error("request body too large")]
+  PayloadTooLarge,
+
+  /// Failed to buffer the request body (excluding explicit size limit).
+  #[error("{0}")]
+  RequestBodyBufferFailed(String),
 
   // ── Not found ─────────────────────────────────────────────────────────────
   /// Session ID (UUID or short_id) does not exist in the database
@@ -98,6 +120,12 @@ impl IntoResponse for AppError {
     let (status, code, message) = match &self {
       // 400
       AppError::Validation(msg) => (StatusCode::BAD_REQUEST, "VALIDATION_ERROR", msg.as_str()),
+      AppError::InvalidJsonSyntax(msg) => {
+        (StatusCode::BAD_REQUEST, "INVALID_JSON_SYNTAX", msg.as_str())
+      }
+      AppError::RequestBodyBufferFailed(msg) => {
+        (StatusCode::BAD_REQUEST, "REQUEST_BODY_ERROR", msg.as_str())
+      }
       AppError::InvalidWsMessage => (
         StatusCode::BAD_REQUEST,
         "INVALID_WS_MESSAGE",
@@ -138,6 +166,20 @@ impl IntoResponse for AppError {
         "This session is read-only",
       ),
 
+      // 413
+      AppError::PayloadTooLarge => (
+        StatusCode::PAYLOAD_TOO_LARGE,
+        "PAYLOAD_TOO_LARGE",
+        "Request body is too large",
+      ),
+
+      // 415
+      AppError::JsonContentTypeRequired => (
+        StatusCode::UNSUPPORTED_MEDIA_TYPE,
+        "UNSUPPORTED_MEDIA_TYPE",
+        "Expected request with Content-Type: application/json",
+      ),
+
       // 404
       AppError::SessionNotFound => (
         StatusCode::NOT_FOUND,
@@ -166,6 +208,11 @@ impl IntoResponse for AppError {
       ),
 
       // 422
+      AppError::InvalidJsonBody(msg) => (
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "INVALID_JSON_BODY",
+        msg.as_str(),
+      ),
       AppError::SessionEventCapReached => (
         StatusCode::UNPROCESSABLE_ENTITY,
         "EVENT_CAP_REACHED",
@@ -211,6 +258,31 @@ impl IntoResponse for AppError {
     }));
 
     (status, body).into_response()
+  }
+}
+
+impl From<JsonRejection> for AppError {
+  fn from(rejection: JsonRejection) -> Self {
+    match rejection {
+      JsonRejection::JsonDataError(e) => AppError::InvalidJsonBody(e.body_text()),
+      JsonRejection::JsonSyntaxError(e) => AppError::InvalidJsonSyntax(e.body_text()),
+      JsonRejection::MissingJsonContentType(_) => AppError::JsonContentTypeRequired,
+      JsonRejection::BytesRejection(e) => AppError::from(e),
+      other => AppError::Internal(anyhow::anyhow!("unhandled JSON rejection: {other}")),
+    }
+  }
+}
+
+impl From<BytesRejection> for AppError {
+  fn from(rejection: BytesRejection) -> Self {
+    match rejection {
+      BytesRejection::FailedToBufferBody(f) => match f {
+        FailedToBufferBody::LengthLimitError(_) => AppError::PayloadTooLarge,
+        FailedToBufferBody::UnknownBodyError(e) => AppError::RequestBodyBufferFailed(e.body_text()),
+        other => AppError::Internal(anyhow::anyhow!("unhandled body buffer failure: {other:?}")),
+      },
+      other => AppError::Internal(anyhow::anyhow!("unhandled bytes rejection: {other:?}")),
+    }
   }
 }
 

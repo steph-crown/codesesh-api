@@ -8,11 +8,11 @@ use crate::{
     SessionSummaryResponse, UpdateSessionNameRequest, UpdateSessionVisibilityRequest,
   },
   errors::AppResult,
+  extractors::AppJson,
   models::{SessionLanguage, SessionStatus, SessionVisibility},
   response::ApiResponse,
   state::AppState,
 };
-use axum::Json;
 
 fn stub_session_detail() -> SessionDetailResponse {
   SessionDetailResponse {
@@ -33,7 +33,7 @@ fn stub_session_detail() -> SessionDetailResponse {
 
 pub async fn create_session(
   State(_state): State<AppState>,
-  Json(_payload): Json<CreateSessionRequest>,
+  AppJson(_payload): AppJson<CreateSessionRequest>,
 ) -> AppResult<ApiResponse<SessionDetailResponse>> {
   Ok(ApiResponse::created(stub_session_detail()))
 }
@@ -61,7 +61,7 @@ pub async fn get_session(
 pub async fn update_session_name(
   State(_state): State<AppState>,
   Path(_session_id): Path<Uuid>,
-  Json(_payload): Json<UpdateSessionNameRequest>,
+  AppJson(_payload): AppJson<UpdateSessionNameRequest>,
 ) -> AppResult<ApiResponse<SessionDetailResponse>> {
   Ok(ApiResponse::ok(stub_session_detail()))
 }
@@ -69,7 +69,7 @@ pub async fn update_session_name(
 pub async fn update_session_visibility(
   State(_state): State<AppState>,
   Path(_session_id): Path<Uuid>,
-  Json(_payload): Json<UpdateSessionVisibilityRequest>,
+  AppJson(_payload): AppJson<UpdateSessionVisibilityRequest>,
 ) -> AppResult<ApiResponse<SessionDetailResponse>> {
   Ok(ApiResponse::ok(stub_session_detail()))
 }

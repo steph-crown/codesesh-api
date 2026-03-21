@@ -89,6 +89,20 @@ fn unwrap_data(v: &Value) -> &Value {
   v.get("data").expect("data field")
 }
 
+/// Error envelope: `{ "error": { "code", "message" } }` (see `errors::AppError`).
+fn unwrap_error(v: &Value) -> (&str, &str) {
+  let err = v.get("error").expect("error object");
+  let code = err
+    .get("code")
+    .and_then(|c| c.as_str())
+    .expect("error.code");
+  let message = err
+    .get("message")
+    .and_then(|m| m.as_str())
+    .expect("error.message");
+  (code, message)
+}
+
 fn session_path(suffix: &str) -> String {
   format!("/api/sessions/{SESSION_ID}{suffix}")
 }
@@ -310,12 +324,24 @@ async fn unknown_api_route_returns_404() {
 }
 
 #[tokio::test]
-async fn post_users_malformed_json_returns_4xx() {
+async fn post_users_malformed_json_returns_400_app_error_shape() {
   let res = call(Method::POST, "/api/users", Some("{not json"), &[]).await;
+  assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+  let v = body_json(res).await;
+  let (code, _) = unwrap_error(&v);
+  assert_eq!(code, "INVALID_JSON_SYNTAX");
+}
+
+#[tokio::test]
+async fn post_users_missing_field_returns_422_app_error_shape() {
+  let res = call(Method::POST, "/api/users", Some("{}"), &[]).await;
+  assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+  let v = body_json(res).await;
+  let (code, message) = unwrap_error(&v);
+  assert_eq!(code, "INVALID_JSON_BODY");
   assert!(
-    res.status().is_client_error(),
-    "malformed JSON should be rejected, got {}",
-    res.status()
+    message.contains("display_name"),
+    "expected message to mention missing field, got {message:?}"
   );
 }
 

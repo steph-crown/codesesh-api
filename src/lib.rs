@@ -1,12 +1,11 @@
 //! CodeSesh API library — same module tree as the binary;
 
 pub mod config;
-pub mod errors;
-
 pub mod db;
 pub mod dto;
+pub mod errors;
+pub mod extractors;
 pub mod handlers;
-pub mod middleware;
 pub mod models;
 pub mod repositories;
 pub mod response;
