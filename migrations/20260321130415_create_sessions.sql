@@ -28,7 +28,7 @@ CREATE TABLE sessions (
     host_id          UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     name             VARCHAR(255) NOT NULL,
     language         session_language NOT NULL DEFAULT 'typescript',
-    visibility       session_visibility NOT NULL DEFAULT 'edit',
+    visibility       session_visibility NOT NULL DEFAULT 'private',
     status           session_status NOT NULL DEFAULT 'active',
     content          TEXT NOT NULL DEFAULT '',
     last_activity_at TIMESTAMPTZ NOT NULL DEFAULT now(),
