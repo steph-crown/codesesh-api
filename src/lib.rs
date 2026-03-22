@@ -12,6 +12,7 @@ pub mod response;
 pub mod routes;
 pub mod services;
 pub mod state;
+pub mod ws;
 
 /// Boot the HTTP server (used by `main`).
 pub async fn run() -> anyhow::Result<()> {

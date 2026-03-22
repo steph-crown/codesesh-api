@@ -9,9 +9,10 @@ use crate::{
   errors::{AppError, AppResult},
   extractors::{AppJson, AuthUser},
   response::ApiResponse,
-  services::session_service,
+  services::{session_service, ws_service},
   state::AppState,
 };
+use crate::ws::messages::SessionEndReason;
 
 pub async fn create_session(
   State(state): State<AppState>,
@@ -76,6 +77,8 @@ pub async fn update_session_visibility(
   let res =
     session_service::update_session_visibility(&state.db, session_id, auth.id, payload).await?;
 
+  ws_service::sync_active_session_visibility(&state, res.id, res.visibility.clone());
+
   Ok(ApiResponse::ok(res))
 }
 
@@ -86,5 +89,6 @@ pub async fn end_session(
 ) -> AppResult<ApiResponse<SessionDetailResponse>> {
   let session_id = session_service::resolve_session_id(&state.db, &short_id).await?;
   let res = session_service::end_session(&state.db, session_id, auth.id).await?;
+  ws_service::broadcast_session_ended(&state, session_id, SessionEndReason::HostEnded).await;
   Ok(ApiResponse::ok(res))
 }

@@ -253,3 +253,48 @@ pub async fn set_ended(pool: &PgPool, session_id: Uuid) -> Result<Session, sqlx:
   .fetch_one(pool)
   .await
 }
+
+pub async fn update_language(
+  pool: &PgPool,
+  session_id: Uuid,
+  language: SessionLanguage,
+) -> Result<Session, sqlx::Error> {
+  sqlx::query_as::<_, Session>(
+    r#"
+    UPDATE sessions
+    SET language = $2, updated_at = now(), last_activity_at = now()
+    WHERE id = $1
+    RETURNING *
+    "#,
+  )
+  .bind(session_id)
+  .bind(language)
+  .fetch_one(pool)
+  .await
+}
+
+/// Persists editor buffer flush: full content + bump `event_count` by drained event count.
+pub async fn apply_content_and_increment_events(
+  pool: &PgPool,
+  session_id: Uuid,
+  content: &str,
+  event_delta: i32,
+) -> Result<(), sqlx::Error> {
+  sqlx::query(
+    r#"
+    UPDATE sessions
+    SET
+      content = $2,
+      event_count = event_count + $3,
+      updated_at = now(),
+      last_activity_at = now()
+    WHERE id = $1
+    "#,
+  )
+  .bind(session_id)
+  .bind(content)
+  .bind(event_delta)
+  .execute(pool)
+  .await?;
+  Ok(())
+}

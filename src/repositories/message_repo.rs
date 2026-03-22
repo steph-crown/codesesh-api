@@ -59,3 +59,36 @@ pub async fn list_history(
   rows.reverse();
   Ok((rows, has_more))
 }
+
+/// Insert a chat message and return the same row shape as [`list_history`].
+pub async fn insert(
+  pool: &PgPool,
+  session_id: Uuid,
+  user_id: Uuid,
+  content: &str,
+) -> Result<MessageWithAuthor, sqlx::Error> {
+  sqlx::query_as::<_, MessageWithAuthor>(
+    r#"
+    WITH ins AS (
+      INSERT INTO chat_messages (session_id, user_id, content)
+      VALUES ($1, $2, $3)
+      RETURNING id, session_id, user_id, content, created_at
+    )
+    SELECT
+      ins.id,
+      ins.session_id,
+      ins.user_id,
+      ins.content,
+      ins.created_at,
+      u.display_name,
+      u.color
+    FROM ins
+    INNER JOIN users u ON u.id = ins.user_id
+    "#,
+  )
+  .bind(session_id)
+  .bind(user_id)
+  .bind(content)
+  .fetch_one(pool)
+  .await
+}

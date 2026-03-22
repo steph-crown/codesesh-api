@@ -48,7 +48,8 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "rus
 
 # ── Async utilities ───────────────────────────────────────────────────────────
 async-trait = "0.1"
-futures     = "0.3"
+futures      = "0.3"
+futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
 
 # ── Logging / tracing ─────────────────────────────────────────────────────────
 tracing            = "0.1"

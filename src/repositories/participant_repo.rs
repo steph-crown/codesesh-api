@@ -99,3 +99,23 @@ pub async fn upsert_active(
   .fetch_one(pool)
   .await
 }
+
+/// Mark the active participant row as left (`left_at = now()`).
+pub async fn mark_left(
+  pool: &PgPool,
+  session_id: Uuid,
+  user_id: Uuid,
+) -> Result<u64, sqlx::Error> {
+  let res = sqlx::query(
+    r#"
+    UPDATE session_participants
+    SET left_at = now()
+    WHERE session_id = $1 AND user_id = $2 AND left_at IS NULL
+    "#,
+  )
+  .bind(session_id)
+  .bind(user_id)
+  .execute(pool)
+  .await?;
+  Ok(res.rows_affected())
+}
