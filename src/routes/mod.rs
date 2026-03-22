@@ -7,6 +7,7 @@ use crate::handlers::{
   execute::execute_code,
   health::health_check,
   messages::list_messages,
+  notes::{get_note, upsert_note},
   participants::{create_participant, get_participation, list_participants},
   sessions::{
     create_session, end_session, get_session, list_sessions, update_session_name,
@@ -43,6 +44,7 @@ pub fn app_router(state: AppState) -> Router {
         )
         .route("/sessions/{short_id}/join", post(create_participant))
         .route("/sessions/{short_id}/messages", get(list_messages))
+        .route("/sessions/{short_id}/notes", get(get_note).patch(upsert_note))
         .route("/sessions/{short_id}/ws", get(session_websocket))
         .route("/sessions/{short_id}/execute", post(execute_code)),
     )

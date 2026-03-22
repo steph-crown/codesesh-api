@@ -1,6 +1,7 @@
 pub mod execute;
 pub mod health;
 pub mod messages;
+pub mod notes;
 pub mod participants;
 pub mod sessions;
 pub mod users;
