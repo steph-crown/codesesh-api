@@ -9,6 +9,7 @@ use crate::handlers::{
   messages::list_messages,
   notes::{get_note, upsert_note},
   participants::{create_participant, get_participation, list_participants},
+  runs::create_run,
   sessions::{
     create_session, end_session, get_session, list_sessions, update_session_name,
     update_session_visibility,
@@ -46,6 +47,7 @@ pub fn app_router(state: AppState) -> Router {
     .route("/sessions/{short_id}/notes", get(get_note).patch(upsert_note))
     .route("/sessions/{short_id}/ws", get(session_websocket))
     .route("/sessions/{short_id}/execute", post(execute_code))
+    .route("/runs", post(create_run))
     .layer(governor)
     .with_state(state);
 

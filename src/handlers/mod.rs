@@ -3,6 +3,7 @@ pub mod health;
 pub mod messages;
 pub mod notes;
 pub mod participants;
+pub mod runs;
 pub mod sessions;
 pub mod users;
 pub mod ws;
