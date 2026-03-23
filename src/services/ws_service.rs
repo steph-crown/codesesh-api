@@ -14,10 +14,11 @@ use crate::state::{ActiveParticipant, ActiveSession, AppState};
 use crate::ws::broadcast;
 use crate::ws::event_buffer::BufferedEvent;
 use crate::ws::messages::{
-  ChatContent, ChatMessagePayload, ClientMessage, CursorPayload, CursorPosition, FullSyncPayload,
-  LanguageChangePayload, LanguagePayload, ParticipantInfo, ParticipantLeavePayload,
-  ParticipantPayload, PingPayload, PingReceivedPayload, PingScope, ServerMessage, SessionEndReason,
-  SessionEndedPayload, TextChangeDelta, TextChangePayload, WsErrorPayload,
+  ChatContent, ChatMessagePayload, ClientMessage, ContentSetPayload, ContentUpdatePayload,
+  CursorPayload, CursorPosition, FullSyncPayload, LanguageChangePayload, LanguagePayload,
+  ParticipantInfo, ParticipantLeavePayload, ParticipantPayload, PingPayload, PingReceivedPayload,
+  PingScope, ServerMessage, SessionEndReason, SessionEndedPayload, TextChangeDelta,
+  TextChangePayload, WsErrorPayload,
 };
 use crate::ws::text_edit::apply_text_delta;
 
@@ -266,6 +267,10 @@ async fn handle_client_message(
       handle_text_change(state, session_id, user, delta).await;
       false
     }
+    ClientMessage::ContentSet(payload) => {
+      handle_content_set(state, session_id, user, payload).await;
+      false
+    }
     ClientMessage::RequestFullSync => {
       handle_request_full_sync(state, session_id, user).await;
       false
@@ -344,6 +349,53 @@ async fn handle_request_full_sync(state: &AppState, session_id: Uuid, user: &Use
   if let Err(e) = send_full_sync(state, session_id, user, is_owner).await {
     tracing::warn!(error = %e, session_id = %session_id, "request_full_sync failed");
   }
+}
+
+async fn handle_content_set(
+  state: &AppState,
+  session_id: Uuid,
+  user: &User,
+  payload: ContentSetPayload,
+) {
+  let Some(mut ent) = state.sessions.get_mut(&session_id) else {
+    return;
+  };
+
+  if !ent.is_editable_by(user.id) {
+    let err = ws_err("READ_ONLY", "This session is read-only");
+    broadcast::send_to(&mut ent, user.id, &err).await;
+    return;
+  }
+
+  let pending = ent.event_buffer.lock().unwrap().len();
+  if ent.published_event_count.saturating_add(pending as i32) >= EVENT_CAP {
+    drop(ent);
+    let _ = session_repo::set_ended(&state.db, session_id).await;
+    broadcast_session_ended(state, session_id, SessionEndReason::EventCapReached).await;
+    return;
+  }
+
+  ent.content = payload.content.clone();
+  ent.version += 1;
+  ent.last_event_at = Instant::now();
+
+  let created_at = ent.session_created_at;
+  let offset_ms = (OffsetDateTime::now_utc() - created_at).whole_milliseconds() as i64;
+  ent.event_buffer.lock().unwrap().push(BufferedEvent {
+    payload: json!({ "type": "content_set" }),
+    actor_user_id: user.id,
+    offset_ms,
+    created_at: OffsetDateTime::now_utc(),
+  });
+
+  let new_version = ent.version;
+  let msg = ServerMessage::ContentUpdate(ContentUpdatePayload {
+    content: payload.content,
+    version: new_version,
+    user_id: user.id,
+    display_name: user.display_name.clone(),
+  });
+  broadcast::broadcast_except(&mut ent, user.id, &msg).await;
 }
 
 async fn handle_text_change(

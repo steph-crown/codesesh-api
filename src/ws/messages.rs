@@ -10,7 +10,8 @@ use crate::models::SessionLanguage;
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ClientMessage {
   TextChange(TextChangeDelta),
-  /// Client asks server for authoritative `full_sync` (e.g. after `VERSION_MISMATCH`).
+  /// Full-document replacement (paste, typing — debounced by client).
+  ContentSet(ContentSetPayload),
   RequestFullSync,
   CursorMove(CursorPosition),
   ChatMessage(ChatContent),
@@ -19,11 +20,18 @@ pub enum ClientMessage {
   Leave,
 }
 
+#[derive(Debug, Deserialize, Clone)]
+pub struct ContentSetPayload {
+  pub content: String,
+}
+
 #[derive(Debug, Serialize, Clone)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ServerMessage {
   FullSync(FullSyncPayload),
   TextChange(TextChangePayload),
+  /// Broadcast full document to peers after a `content_set`.
+  ContentUpdate(ContentUpdatePayload),
   CursorMove(CursorPayload),
   ChatMessage(ChatMessagePayload),
   LanguageChange(LanguageChangePayload),
@@ -32,6 +40,14 @@ pub enum ServerMessage {
   PingReceived(PingReceivedPayload),
   SessionEnded(SessionEndedPayload),
   Error(WsErrorPayload),
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct ContentUpdatePayload {
+  pub content: String,
+  pub version: u64,
+  pub user_id: Uuid,
+  pub display_name: String,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
