@@ -8,7 +8,7 @@ use serde_json::json;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
-use crate::models::{Session, SessionStatus, User};
+use crate::models::{Session, User};
 use crate::repositories::{message_repo, participant_repo, session_repo, user_repo};
 use crate::state::{ActiveParticipant, ActiveSession, AppState};
 use crate::ws::broadcast;
@@ -23,7 +23,9 @@ use crate::ws::text_edit::apply_text_delta;
 
 const MAX_CHAT_CHARS: usize = 2000;
 const EVENT_CAP: i32 = 100_000;
-const IDLE_TIMEOUT: Duration = Duration::from_secs(30 * 60);
+// Re-enable with the idle-timeout block in `remove_participant` if you want auto-end
+// after everyone disconnects from the WebSocket (see commented section there).
+// const IDLE_TIMEOUT: Duration = Duration::from_secs(30 * 60);
 
 fn new_active_session(s: &Session) -> ActiveSession {
   ActiveSession {
@@ -510,31 +512,35 @@ pub async fn remove_participant(
     "websocket participant disconnected"
   );
 
-  if remaining == 0 {
-    let state_clone = state.clone();
-    tokio::spawn(async move {
-      tokio::time::sleep(IDLE_TIMEOUT).await;
-      let Some(ent) = state_clone.sessions.get(&session_id) else {
-        return;
-      };
-      if !ent.participants.is_empty() {
-        return;
-      }
-      drop(ent);
-      let s = match session_repo::find_by_id(&state_clone.db, session_id).await {
-        Ok(Some(s)) => s,
-        _ => return,
-      };
-      if s.status != SessionStatus::Active {
-        return;
-      }
-      if session_repo::set_ended(&state_clone.db, session_id).await.is_err() {
-        return;
-      }
-      broadcast_session_ended(&state_clone, session_id, SessionEndReason::IdleTimeout).await;
-      tracing::info!(session_id = %session_id, "session ended: idle timeout");
-    });
-  }
+  // ── Idle auto-end (disabled): when the last WS client disconnects, wait N minutes;
+  // if still no one connected, mark session ended with `IdleTimeout`.
+  // To reintroduce: uncomment `IDLE_TIMEOUT` above, this block, and add
+  // `SessionStatus` back to the `crate::models` import.
+  // if remaining == 0 {
+  //   let state_clone = state.clone();
+  //   tokio::spawn(async move {
+  //     tokio::time::sleep(IDLE_TIMEOUT).await;
+  //     let Some(ent) = state_clone.sessions.get(&session_id) else {
+  //       return;
+  //     };
+  //     if !ent.participants.is_empty() {
+  //       return;
+  //     }
+  //     drop(ent);
+  //     let s = match session_repo::find_by_id(&state_clone.db, session_id).await {
+  //       Ok(Some(s)) => s,
+  //       _ => return,
+  //     };
+  //     if s.status != SessionStatus::Active {
+  //       return;
+  //     }
+  //     if session_repo::set_ended(&state_clone.db, session_id).await.is_err() {
+  //       return;
+  //     }
+  //     broadcast_session_ended(&state_clone, session_id, SessionEndReason::IdleTimeout).await;
+  //     tracing::info!(session_id = %session_id, "session ended: idle timeout");
+  //   });
+  // }
 }
 
 fn spawn_flush_loop(state: AppState, session_id: Uuid) {
