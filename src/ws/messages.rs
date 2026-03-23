@@ -10,6 +10,8 @@ use crate::models::SessionLanguage;
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ClientMessage {
   TextChange(TextChangeDelta),
+  /// Client asks server for authoritative `full_sync` (e.g. after `VERSION_MISMATCH`).
+  RequestFullSync,
   CursorMove(CursorPosition),
   ChatMessage(ChatContent),
   LanguageChange(LanguagePayload),

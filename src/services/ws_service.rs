@@ -266,6 +266,10 @@ async fn handle_client_message(
       handle_text_change(state, session_id, user, delta).await;
       false
     }
+    ClientMessage::RequestFullSync => {
+      handle_request_full_sync(state, session_id, user).await;
+      false
+    }
     ClientMessage::CursorMove(pos) => {
       handle_cursor_move(state, session_id, user, pos).await;
       false
@@ -324,6 +328,21 @@ async fn handle_ping(
       }
       broadcast::send_to(&mut ent, target_id, &msg).await;
     }
+  }
+}
+
+async fn handle_request_full_sync(state: &AppState, session_id: Uuid, user: &User) {
+  let session = match session_repo::find_by_id(&state.db, session_id).await {
+    Ok(Some(s)) => s,
+    Ok(None) => return,
+    Err(e) => {
+      tracing::warn!(error = %e, "request_full_sync: find session failed");
+      return;
+    }
+  };
+  let is_owner = session.host_id == user.id;
+  if let Err(e) = send_full_sync(state, session_id, user, is_owner).await {
+    tracing::warn!(error = %e, session_id = %session_id, "request_full_sync failed");
   }
 }
 
@@ -472,6 +491,24 @@ async fn handle_language_change(
     display_name: user.display_name.clone(),
   });
   broadcast::broadcast_all(&mut ent, &msg).await;
+
+  // Keep DB `content` aligned with live buffer when language changes (language was flushed above).
+  let content_snapshot = ent.content.clone();
+  drop(ent);
+  if let Err(e) = session_repo::apply_content_and_increment_events(
+    &state.db,
+    session_id,
+    &content_snapshot,
+    0,
+  )
+  .await
+  {
+    tracing::warn!(
+      error = %e,
+      session_id = %session_id,
+      "persist content with language_change failed"
+    );
+  }
 }
 
 async fn handle_disconnect(
@@ -547,7 +584,7 @@ pub async fn remove_participant(
 
 fn spawn_flush_loop(state: AppState, session_id: Uuid) {
   tokio::spawn(async move {
-    let mut interval = tokio::time::interval(Duration::from_secs(2));
+    let mut interval = tokio::time::interval(Duration::from_millis(500));
     loop {
       interval.tick().await;
       if !state.sessions.contains_key(&session_id) {
