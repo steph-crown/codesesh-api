@@ -9,7 +9,7 @@ use time::OffsetDateTime;
 use uuid::Uuid;
 
 use crate::models::{Session, User};
-use crate::repositories::{message_repo, participant_repo, session_repo, user_repo};
+use crate::repositories::{message_repo, participant_repo, session_repo};
 use crate::state::{ActiveParticipant, ActiveSession, AppState};
 use crate::ws::broadcast;
 use crate::ws::event_buffer::BufferedEvent;
@@ -203,31 +203,33 @@ async fn send_full_sync(
   let (history, _) = message_repo::list_history(&state.db, session_id, 50, None).await?;
   let messages: Vec<ChatMessagePayload> = history.iter().map(chat_row_to_payload).collect();
 
-  let participants_rows = participant_repo::list_with_display_names(&state.db, session_id).await?;
-  let mut participants: Vec<ParticipantInfo> = participants_rows
-    .into_iter()
-    .map(|(p, name, color)| ParticipantInfo {
-      user_id: p.user_id,
-      display_name: name,
-      color,
-      joined_at: p.joined_at,
-    })
-    .collect();
-
   let session = session_repo::find_by_id(&state.db, session_id)
     .await?
     .ok_or(sqlx::Error::RowNotFound)?;
 
-  let host_in_list = participants.iter().any(|p| p.user_id == session.host_id);
-  if !host_in_list {
-    let host = user_repo::find_by_id(&state.db, session.host_id)
-      .await?
-      .ok_or(sqlx::Error::RowNotFound)?;
+  // Only currently connected WebSocket clients — must match participant_leave / joins so clients
+  // don't treat DB session members who aren't in the room as "present".
+  let active_snapshot: Vec<(Uuid, String, String)> = {
+    let ent = state.sessions.get(&session_id).ok_or(sqlx::Error::RowNotFound)?;
+    ent
+      .participants
+      .iter()
+      .map(|p| (p.user_id, p.display_name.clone(), p.color.clone()))
+      .collect()
+  };
+
+  let mut participants: Vec<ParticipantInfo> = Vec::with_capacity(active_snapshot.len());
+  for (uid, display_name, color) in active_snapshot {
+    let joined_at =
+      match participant_repo::find_by_session_and_user(&state.db, session_id, uid).await? {
+        Some(p) => p.joined_at,
+        None => session.created_at,
+      };
     participants.push(ParticipantInfo {
-      user_id: session.host_id,
-      display_name: host.display_name,
-      color: host.color,
-      joined_at: session.created_at,
+      user_id: uid,
+      display_name,
+      color,
+      joined_at,
     });
   }
 
