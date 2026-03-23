@@ -203,6 +203,7 @@ dependencies = [
  "dotenvy",
  "futures",
  "futures-util",
+ "governor",
  "http-body-util",
  "rand 0.8.5",
  "reqwest",

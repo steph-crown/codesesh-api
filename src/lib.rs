@@ -7,6 +7,7 @@ pub mod errors;
 pub mod extractors;
 pub mod handlers;
 pub mod models;
+pub mod rate_limit;
 pub mod repositories;
 pub mod response;
 pub mod routes;
@@ -44,7 +45,11 @@ pub async fn run() -> anyhow::Result<()> {
   let addr = format!("{}:{}", config.host, config.port);
   let listener = tokio::net::TcpListener::bind(&addr).await?;
   tracing::info!("listening on {}", addr);
-  axum::serve(listener, app).await?;
+  axum::serve(
+    listener,
+    app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+  )
+  .await?;
 
   Ok(())
 }

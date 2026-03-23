@@ -31,9 +31,12 @@ async fn router() -> axum::Router {
   ROUTER
     .get_or_init(|| async {
       dotenvy::dotenv().ok();
-      let config = Config::load().expect(
+      let mut config = Config::load().expect(
         "set DATABASE_URL, FRONTEND_URL, JUDGE0_URL for integration tests (see .env.example)",
       );
+      // One shared router for all cases: avoid 429s from the global governor bucket in normal tests.
+      config.rate_limit_per_second = 100_000;
+      config.rate_limit_burst_size = 100_000;
       let pool = db::create_pool(&config)
         .await
         .expect("connect DATABASE_URL");
@@ -41,7 +44,7 @@ async fn router() -> axum::Router {
         .run(&pool)
         .await
         .expect("run migrations");
-      let state = AppState::new(pool, config.clone());
+      let state = AppState::new(pool, config);
       routes::app_router(state)
     })
     .await
@@ -60,6 +63,8 @@ async fn call(
   if body.is_some() {
     builder = builder.header(header::CONTENT_TYPE, "application/json");
   }
+  // SmartIpKeyExtractor: stable client key for tests (no ConnectInfo in oneshot).
+  builder = builder.header("x-forwarded-for", "127.0.0.1");
   for (k, v) in extra_headers {
     builder = builder.header(*k, *v);
   }

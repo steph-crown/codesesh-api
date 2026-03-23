@@ -15,8 +15,9 @@ pub struct Config {
   // Judge0
   pub judge0_url: String,
 
-  // Rate limiting
+  /// Sustained average requests per second per client (token bucket refill), see `rate_limit` module.
   pub rate_limit_per_second: u64,
+  /// Max burst (bucket size) before steady rate applies.
   pub rate_limit_burst_size: u32,
 }
 
