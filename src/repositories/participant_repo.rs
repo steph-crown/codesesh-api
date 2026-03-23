@@ -57,6 +57,25 @@ pub async fn list_with_display_names(
     .collect())
 }
 
+/// Single row for a user in a session (if any).
+pub async fn find_by_session_and_user(
+  pool: &PgPool,
+  session_id: Uuid,
+  user_id: Uuid,
+) -> Result<Option<SessionParticipant>, sqlx::Error> {
+  sqlx::query_as::<_, SessionParticipant>(
+    r#"
+    SELECT id, session_id, user_id, joined_at, left_at
+    FROM session_participants
+    WHERE session_id = $1 AND user_id = $2
+    "#,
+  )
+  .bind(session_id)
+  .bind(user_id)
+  .fetch_optional(pool)
+  .await
+}
+
 /// Whether the user has an active (not left) participant row for this session.
 pub async fn is_active_participant(
   pool: &PgPool,

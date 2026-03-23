@@ -100,10 +100,30 @@ pub async fn handle_connection(
   }
 
   {
+    let joined_at = match participant_repo::find_by_session_and_user(
+      &state.db,
+      session_id,
+      user.id,
+    )
+    .await
+    {
+      Ok(Some(p)) => p.joined_at,
+      Ok(None) => OffsetDateTime::now_utc(),
+      Err(e) => {
+        tracing::warn!(
+          error = %e,
+          session_id = %session_id,
+          user_id = %user.id,
+          "failed to load joined_at for participant_join; using now"
+        );
+        OffsetDateTime::now_utc()
+      }
+    };
     let join = ServerMessage::ParticipantJoin(ParticipantPayload {
       user_id: user.id,
       display_name: user.display_name.clone(),
       color: user.color.clone(),
+      joined_at,
     });
     if let Some(mut ent) = state.sessions.get_mut(&session_id) {
       broadcast::broadcast_except(&mut ent, user.id, &join).await;
@@ -188,6 +208,7 @@ async fn send_full_sync(
       user_id: p.user_id,
       display_name: name,
       color,
+      joined_at: p.joined_at,
     })
     .collect();
 
@@ -204,6 +225,7 @@ async fn send_full_sync(
       user_id: session.host_id,
       display_name: host.display_name,
       color: host.color,
+      joined_at: session.created_at,
     });
   }
 

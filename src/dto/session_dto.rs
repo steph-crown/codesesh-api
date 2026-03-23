@@ -72,6 +72,7 @@ pub struct SessionSummaryResponse {
 pub struct SessionDetailResponse {
   pub id: Uuid,
   pub short_id: String,
+  pub host_id: Uuid,
   pub name: String,
   pub language: SessionLanguage,
   pub visibility: SessionVisibility,
@@ -120,6 +121,7 @@ impl SessionDetailResponse {
     Self {
       id: session.id,
       short_id: session.short_id,
+      host_id: session.host_id,
       name: session.name,
       language: session.language,
       visibility: session.visibility,

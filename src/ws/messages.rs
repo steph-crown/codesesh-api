@@ -110,6 +110,8 @@ pub struct ParticipantInfo {
   pub user_id: Uuid,
   pub display_name: String,
   pub color: String,
+  /// First time this user joined this session (unchanged on re-join).
+  pub joined_at: OffsetDateTime,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -117,6 +119,7 @@ pub struct ParticipantPayload {
   pub user_id: Uuid,
   pub display_name: String,
   pub color: String,
+  pub joined_at: OffsetDateTime,
 }
 
 #[derive(Debug, Serialize, Clone)]
