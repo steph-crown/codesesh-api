@@ -13,6 +13,7 @@ pub enum ClientMessage {
   CursorMove(CursorPosition),
   ChatMessage(ChatContent),
   LanguageChange(LanguagePayload),
+  Ping(PingPayload),
   Leave,
 }
 
@@ -26,6 +27,7 @@ pub enum ServerMessage {
   LanguageChange(LanguageChangePayload),
   ParticipantJoin(ParticipantPayload),
   ParticipantLeave(ParticipantLeavePayload),
+  PingReceived(PingReceivedPayload),
   SessionEnded(SessionEndedPayload),
   Error(WsErrorPayload),
 }
@@ -59,6 +61,28 @@ pub struct ChatContent {
 #[derive(Debug, Deserialize, Clone)]
 pub struct LanguagePayload {
   pub language: SessionLanguage,
+}
+
+/// Client → server: notify others. `target_user_id == None` pings everyone except the sender.
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct PingPayload {
+  pub target_user_id: Option<Uuid>,
+}
+
+/// Server → client: someone pinged you (or everyone).
+#[derive(Debug, Serialize, Clone)]
+pub struct PingReceivedPayload {
+  pub from_user_id: Uuid,
+  pub from_display_name: String,
+  pub from_color: String,
+  pub scope: PingScope,
+}
+
+#[derive(Debug, Serialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum PingScope {
+  Everyone,
+  Direct,
 }
 
 #[derive(Debug, Serialize, Clone)]

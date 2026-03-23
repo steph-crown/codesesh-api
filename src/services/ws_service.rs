@@ -16,8 +16,8 @@ use crate::ws::event_buffer::BufferedEvent;
 use crate::ws::messages::{
   ChatContent, ChatMessagePayload, ClientMessage, CursorPayload, CursorPosition, FullSyncPayload,
   LanguageChangePayload, LanguagePayload, ParticipantInfo, ParticipantLeavePayload,
-  ParticipantPayload, ServerMessage, SessionEndReason, SessionEndedPayload, TextChangeDelta,
-  TextChangePayload, WsErrorPayload,
+  ParticipantPayload, PingPayload, PingReceivedPayload, PingScope, ServerMessage, SessionEndReason,
+  SessionEndedPayload, TextChangeDelta, TextChangePayload, WsErrorPayload,
 };
 use crate::ws::text_edit::apply_text_delta;
 
@@ -274,9 +274,51 @@ async fn handle_client_message(
       handle_language_change(state, session_id, user, lang).await;
       false
     }
+    ClientMessage::Ping(p) => {
+      handle_ping(state, session_id, user, p).await;
+      false
+    }
     ClientMessage::Leave => {
       remove_participant(state, session_id, user.id, &user.display_name).await;
       true
+    }
+  }
+}
+
+async fn handle_ping(
+  state: &AppState,
+  session_id: Uuid,
+  user: &User,
+  payload: PingPayload,
+) {
+  let Some(mut ent) = state.sessions.get_mut(&session_id) else {
+    return;
+  };
+
+  let scope = match payload.target_user_id {
+    None => PingScope::Everyone,
+    Some(_) => PingScope::Direct,
+  };
+
+  let msg = ServerMessage::PingReceived(PingReceivedPayload {
+    from_user_id: user.id,
+    from_display_name: user.display_name.clone(),
+    from_color: user.color.clone(),
+    scope,
+  });
+
+  match payload.target_user_id {
+    None => {
+      broadcast::broadcast_except(&mut ent, user.id, &msg).await;
+    }
+    Some(target_id) => {
+      if target_id == user.id {
+        return;
+      }
+      if !ent.participants.iter().any(|p| p.user_id == target_id) {
+        return;
+      }
+      broadcast::send_to(&mut ent, target_id, &msg).await;
     }
   }
 }
