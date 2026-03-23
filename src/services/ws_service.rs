@@ -395,7 +395,7 @@ async fn handle_content_set(
     user_id: user.id,
     display_name: user.display_name.clone(),
   });
-  broadcast::broadcast_except(&mut ent, user.id, &msg).await;
+  broadcast::broadcast_all(&mut ent, &msg).await;
 }
 
 async fn handle_text_change(
