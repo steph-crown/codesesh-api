@@ -1,3 +1,4 @@
 [toolchain]
-# Must match `rust-version` in Cargo.toml and NIXPACKS_RUST_VERSION in nixpacks.toml.
+# Must match `rust-version` in Cargo.toml. Used by local rustup and Railpack.
 channel = "1.88.0"
+profile = "minimal"

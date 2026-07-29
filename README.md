@@ -127,16 +127,19 @@ On startup the binary loads `.env`, **applies SQLx migrations** from `./migratio
 2. In **codesesh-frontend**, set `NEXT_PUBLIC_API_URL=http://localhost:8080` and run `pnpm dev`.
 3. Ensure `FRONTEND_URL` matches where the browser loads the Next app so CORS passes.
 
-### Deploy (Railway / Nixpacks)
+### Deploy (Railway)
 
-This crate needs **Rust ≥ 1.88** (`rust-version` in `Cargo.toml`). Nixpacks often ships **1.85.x** unless you pin the toolchain.
+This crate needs **Rust ≥ 1.88** (`rust-version` in `Cargo.toml`). Railway’s default Nixpacks/Railpack image often ships **rustc 1.85.x**, which fails on current dependencies (`time`, `home`, etc.).
 
-The repo includes:
+**Recommended:** deploy with the included **`Dockerfile`** (Railway auto-detects it and builds with `rust:1.88-bookworm`).
+
+If you stay on Nixpacks/Railpack instead of Docker:
 
 - **`rust-toolchain.toml`** — `channel = "1.88.0"`
-- **`nixpacks.toml`** — `NIXPACKS_RUST_VERSION = "1.88"`
+- **`nixpacks.toml`** — `NIXPACKS_RUST_VERSION = "1.88.0"`
+- Railway variable **`RAILPACK_RUST_VERSION=1.88.0`** (Railpack) or **`NIXPACKS_RUST_VERSION=1.88.0`** (Nixpacks)
 
-After pushing, trigger a **new deploy** (clear build cache if the builder still reports `rustc 1.85.1`). You can also set **`NIXPACKS_RUST_VERSION=1.88`** in the Railway service environment variables.
+After pushing, trigger a **new deploy** and **clear build cache** if logs still show `rustc 1.85.1`.
 
 ---
 
