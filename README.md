@@ -127,6 +127,17 @@ On startup the binary loads `.env`, **applies SQLx migrations** from `./migratio
 2. In **codesesh-frontend**, set `NEXT_PUBLIC_API_URL=http://localhost:8080` and run `pnpm dev`.
 3. Ensure `FRONTEND_URL` matches where the browser loads the Next app so CORS passes.
 
+### Deploy (Railway / Nixpacks)
+
+This crate needs **Rust ≥ 1.88** (`rust-version` in `Cargo.toml`). Nixpacks often ships **1.85.x** unless you pin the toolchain.
+
+The repo includes:
+
+- **`rust-toolchain.toml`** — `channel = "1.88.0"`
+- **`nixpacks.toml`** — `NIXPACKS_RUST_VERSION = "1.88"`
+
+After pushing, trigger a **new deploy** (clear build cache if the builder still reports `rustc 1.85.1`). You can also set **`NIXPACKS_RUST_VERSION=1.88`** in the Railway service environment variables.
+
 ---
 
 ## How clients authenticate

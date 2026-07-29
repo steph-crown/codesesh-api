@@ -1,3 +1,3 @@
 [toolchain]
-# `time`, `home`, and other deps require >= 1.88; Railway/Nixpacks default was 1.85.x without this file.
-channel = "1.88"
+# Must match `rust-version` in Cargo.toml and NIXPACKS_RUST_VERSION in nixpacks.toml.
+channel = "1.88.0"
